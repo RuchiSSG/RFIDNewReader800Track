@@ -21,6 +21,7 @@ namespace RFIDReaderPortal.Services
         private string _deviceId;
         private string _location;
         private string _eventName;
+        private string _eventId;
         private string _sessionid;
         private string _ipaddress;
 
@@ -36,6 +37,7 @@ namespace RFIDReaderPortal.Services
         private const int MAX_DATA_COUNT = 1000;
         private const int BUFFER_SIZE = 16384; // Increased to 16KB
         private readonly List<RfidData> _storedRfidData = new List<RfidData>();
+        private List<RfidData> _snapshotData = new List<RfidData>();
 
         // Buffer to accumulate incomplete hex data
         private StringBuilder _hexBuffer = new StringBuilder();
@@ -51,12 +53,13 @@ namespace RFIDReaderPortal.Services
         }
 
         public void SetParameters(string accessToken, string userid, string recruitid,
-                                  string deviceId, string location, string eventName,
+                                  string deviceId, string location, string eventName, string eventId,
                                   string ipaddress, string sessionid)
         {
             _accessToken = accessToken;
             _userid = userid;
             _recruitid = recruitid;
+            _eventId = eventId;
             _deviceId = deviceId;
             _location = location;
             _eventName = eventName;
@@ -75,16 +78,38 @@ namespace RFIDReaderPortal.Services
                 Task.Run(async () => await ListenAsync());
             }
         }
-
         public void Stop()
         {
             if (IsRunning)
             {
-                _tcpListener.Stop();
                 IsRunning = false;
-                _logger.LogInformation("TCP Listener stopped");
+                _tcpListener.Stop();
+
+                lock (_storedRfidData)
+                {
+                    _snapshotData = _storedRfidData
+                        .Select(d => new RfidData
+                        {
+                            TagId = d.TagId,
+                            Timestamp = d.Timestamp,
+                            LapTimes = new List<DateTime>(d.LapTimes)
+                        })
+                        .ToList();
+                }
+
+                _logger.LogInformation("TCP Listener stopped and snapshot taken.");
             }
         }
+
+        //public void Stop()
+        //{
+        //    if (IsRunning)
+        //    {
+        //        IsRunning = false;
+        //        _tcpListener.Stop();
+        //        _logger.LogInformation("TCP Listener stopped");
+        //    }
+        //}
 
         private async Task ListenAsync()
         {
@@ -240,7 +265,7 @@ namespace RFIDReaderPortal.Services
 
                 if (timeSinceLastScan > _duplicatePreventionWindow)
                 {
-                    if (_eventName == "0b5faa53-698e-46d6-9a61-ccc04885ea1d") // 100m
+                    if (_eventName == "100 Meter Running") // 100m
                     {
                         // Always update for 100m (single lap)
                         rfidData.Timestamp = timestamp;
@@ -252,7 +277,7 @@ namespace RFIDReaderPortal.Services
                         shouldStore = true;
                         _logger.LogInformation($"Updated 100m time for tag {epc}: {timestamp:HH:mm:ss:fff}");
                     }
-                    else if (_eventName == "917a859f-3155-4f0f-b702-8fe67ba82949") // 800m
+                    else if (_eventName == "800 Meter Running") // 800m
                     {
                         // Always update for 100m (single lap)
                         rfidData.Timestamp = timestamp;
@@ -266,8 +291,8 @@ namespace RFIDReaderPortal.Services
                     }
                     else
                     {
-                        int maxLaps = _eventName == "608fc379-bc49-42aa-95cd-21a6eb9d53f5" ? 2 : 1;
-                        // _eventName == "917a859f-3155-4f0f-b702-8fe67ba82949" ? 3 :
+                        int maxLaps = _eventName == "1600 Meter Running" ? 2 : 1;
+                       // _eventName == "800 Meter Running" ? 3 :
 
                         if (rfidData.LapTimes.Count < maxLaps)
                         {
@@ -379,7 +404,7 @@ namespace RFIDReaderPortal.Services
 
             await _apiService.PostRFIDRunningLogAsync(
                 _accessToken, _userid, _recruitid, _deviceId,
-                _location, _eventName, dataToInsert,
+                _location, _eventName, _eventId, dataToInsert,
                 _sessionid, _ipaddress
             );
         }
@@ -396,14 +421,24 @@ namespace RFIDReaderPortal.Services
             _hexBuffer.Clear();
             _logger.LogInformation("All RFID data cleared");
         }
-
         public RfidData[] GetReceivedData()
         {
+            if (!IsRunning && _snapshotData != null)
+                return _snapshotData.OrderBy(d => d.TagId).ToArray();
+
             return _receivedDataDict.Values
                 .Where(d => d.Timestamp > _lastClearTime)
                 .OrderBy(d => d.TagId)
                 .ToArray();
         }
+
+        //public RfidData[] GetReceivedData()
+        //{
+        //    return _receivedDataDict.Values
+        //        .Where(d => d.Timestamp > _lastClearTime)
+        //        .OrderBy(d => d.TagId)
+        //        .ToArray();
+        //}
 
         public string[] GetHexData()
         {

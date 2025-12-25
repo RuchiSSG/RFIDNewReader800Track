@@ -40,7 +40,7 @@ namespace RFIDReaderPortal.Controllers
             _rfidDiscoveryService = rfidDiscoveryService ?? throw new ArgumentNullException(nameof(rfidDiscoveryService));
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _tcpListenerService = tcpListenerService ?? throw new ArgumentNullException(nameof(tcpListenerService));
-           _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _baseUrl = configuration["ApiBaseUrl"];
             //// Use IConfiguration to get the ApiBaseUrl
@@ -144,7 +144,9 @@ namespace RFIDReaderPortal.Controllers
                     if (!string.IsNullOrEmpty(item.Location))
                         Response.Cookies.Append("Location", item.Location);
                     if (!string.IsNullOrEmpty(item.eventName))
-                        Response.Cookies.Append("EventName", item.EventId);
+                        Response.Cookies.Append("EventName", item.eventName);
+                    if (!string.IsNullOrEmpty(item.eventName))
+                        Response.Cookies.Append("EventId", item.EventId);
                 }
 
                 if (ipDataResponse.Count == 0)
@@ -220,7 +222,7 @@ namespace RFIDReaderPortal.Controllers
             }
             catch (Exception ex)
             {
-              //  _logger.LogError(ex, "Error occurred in SubmitButton");
+                //  _logger.LogError(ex, "Error occurred in SubmitButton");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -301,9 +303,11 @@ namespace RFIDReaderPortal.Controllers
         [HttpPost]
         public async Task<IActionResult> Stop()
         {
+            // Stop the listener so no new data comes in
+            _tcpListenerService.Stop();
             await _tcpListenerService.InsertStoredRfidDataAsync(); // Call method to insert data
 
-            return Json(new { success = true, message = "RFID data inserted successfully." });
+            return Json(new { success = true, message = "RFID listener stopped and data inserted successfully." });
         }
 
         public async Task<IActionResult> Reader()
@@ -315,13 +319,14 @@ namespace RFIDReaderPortal.Controllers
                 string recruitid = Request.Cookies["recruitid"];
                 string deviceId = Request.Cookies["DeviceId"];
                 string location = Request.Cookies["Location"];
-                string eventName = Request.Cookies["EventId"];
+                string eventName = Request.Cookies["EventName"];
+                string eventId = Request.Cookies["EventId"];
                 string ipaddress = Request.Cookies["IpAddress"];
                 string sesionid = Request.Cookies["sessionid"];
 
                 if (!_tcpListenerService.IsRunning)
                 {
-                    _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, sesionid, ipaddress);
+                    _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, eventId, sesionid, ipaddress);
                     _tcpListenerService.Start();
                 }
 
@@ -376,7 +381,7 @@ namespace RFIDReaderPortal.Controllers
             }
             catch (Exception ex)
             {
-               // _logger.LogError(ex, "Error occurred in Reader action");
+                // _logger.LogError(ex, "Error occurred in Reader action");
                 return View("Error", new ErrorViewModel { RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
@@ -439,7 +444,7 @@ namespace RFIDReaderPortal.Controllers
             string ipaddress = Request.Cookies["IpAddress"];
             string sesionid = Request.Cookies["sessionid"];
 
-            _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, ipaddress, sesionid);
+            _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, eventId, ipaddress, sesionid);
 
             // Ensure the listener is running
             if (!_tcpListenerService.IsRunning)
@@ -526,7 +531,7 @@ namespace RFIDReaderPortal.Controllers
             }
             catch (Exception ex)
             {
-              //  _logger.LogError(ex, "Error occurred while deleting RFID records");
+                //  _logger.LogError(ex, "Error occurred while deleting RFID records");
                 return StatusCode(500, new { success = false, message = "An error occurred while deleting RFID records." });
             }
         }
