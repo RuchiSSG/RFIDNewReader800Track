@@ -109,12 +109,12 @@ namespace RFIDReaderPortal.Services
         }
         public async Task<bool> PostRFIDRunningLogAsync(
             string accessToken, string userid, string recruitid, string DeviceId,
-            string Location, string eventName, List<RfidData> rfidDataList,
+            string Location, string eventName, string eventId, List<RfidData> rfidDataList,
             string sessionid, string ipaddress)
         {
             try
             {
-                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&sessionid={sessionid}&ipaddress={ipaddress}";
+                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&eventId={eventId}&sessionid={sessionid}&ipaddress={ipaddress}";
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
 
                 // Group by TagId
@@ -127,23 +127,17 @@ namespace RFIDReaderPortal.Services
                     }).ToList();
 
                 // Decide lap count based on event
-                int totalLaps = eventName == "608fc379-bc49-42aa-95cd-21a6eb9d53f5" ? 2 :
-                              //  eventName == "917a859f-3155-4f0f-b702-8fe67ba82949" ? 3 :
-                                1;
+                int totalLaps = eventName == "1600 Meter Running" ? 2 : 1;
+                             // eventName == "800 Meter Running" ? 3 :
+                              
 
                 // Prepare final request data
                 var requestData = groupedData.Select(x => new
                 {
-                   RFIDdtagata = x.TagId,
-                    //Lap1 = x.Laps.Count >= 1 && x.Laps[0].Timestamp.HasValue ? x.Laps[0].Timestamp.Value.ToString("HH:mm:ss:fff") : null,
-                    //Lap2 = x.Laps.Count >= 2 && x.Laps[1].Timestamp.HasValue ? x.Laps[1].Timestamp.Value.ToString("HH:mm:ss:fff") : null,
-                    //Lap3 = x.Laps.Count >= 3 && x.Laps[2].Timestamp.HasValue ? x.Laps[2].Timestamp.Value.ToString("HH:mm:ss:fff") : null,
-                    //Lap4 = x.Laps.Count >= 4 && x.Laps[3].Timestamp.HasValue ? x.Laps[3].Timestamp.Value.ToString("HH:mm:ss:fff") : null,
-                    //Lap5 = x.Laps.Count >= 5 && x.Laps[4].Timestamp.HasValue ? x.Laps[4].Timestamp.Value.ToString("HH:mm:ss:fff") : null,
-
+                    RFIDdtagata = x.TagId,
                     Lap1 = x.Laps.Count >= 1 ? x.Laps[0].Timestamp.ToString("HH:mm:ss:fff") : null,
                     Lap2 = x.Laps.Count >= 2 ? x.Laps[1].Timestamp.ToString("HH:mm:ss:fff") : null,
-                   // Lap3 = x.Laps.Count >= 3 ? x.Laps[2].Timestamp.ToString("HH:mm:ss:fff") : null,
+                    //Lap3 = x.Laps.Count >= 3 ? x.Laps[2].Timestamp.ToString("HH:mm:ss:fff") : null,
                     //Lap4 = x.Laps.Count >= 4 ? x.Laps[3].Timestamp.ToString("HH:mm:ss:fff") : null,
                     //Lap5 = x.Laps.Count >= 5 ? x.Laps[4].Timestamp.ToString("HH:mm:ss:fff") : null,
 

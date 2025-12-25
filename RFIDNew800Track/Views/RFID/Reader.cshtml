@@ -9,7 +9,7 @@
 <div class="d-flex justify-content-end mb-3">
     <button id="resetButton" type="button" class="btn btn-warning me-2">Reset</button>
     <a href="@Url.Action("Login", "Account")" class="btn btn-outline-danger">Logout</a>
-   @*  <button id="printButton" type="button" class="btn btn-primary">
+    @*  <button id="printButton" type="button" class="btn btn-primary">
         Print
     </button> *@
 </div>
@@ -134,7 +134,7 @@
                 foreach (var entry in grouped)
                 {
                     var tagId = entry.Key;
-                   @*  var times = entry.Value
+                    @*  var times = entry.Value
                     .Select(t => t.Timestamp.HasValue ? t.Timestamp.Value.ToString("HH:mm:ss:fff") : null)
                     .ToList(); *@
 
@@ -212,9 +212,9 @@
         // Success message after login
         @if (TempData["SuccessMessage"] != null)
         {
-                <text>
-                    toastr.success('@TempData["SuccessMessage"]');
-                </text>
+                    <text>
+                        toastr.success('@TempData["SuccessMessage"]');
+                    </text>
         }
 
             $(document).ready(function () {
@@ -285,16 +285,17 @@
                 let lapCount = item.lapTimes.length;
                 let timeHtml = "";
 
-                if (eventName == "0b5faa53-698e-46d6-9a61-ccc04885ea1d") {
+                if (eventName == "100 Meter Running") {
                     // Show only latest time for 100m
                     timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
                     lapCount = ""; // Hide lap count
                 }
-                else if (eventName == "917a859f-3155-4f0f-b702-8fe67ba82949") {
+              else  if (eventName == "800 Meter Running") {
                     // Show only latest time for 100m
                     timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
                     lapCount = ""; // Hide lap count
-                }else {
+                }
+               else {
                     // Show each lap with "Lap x: timestamp"
                     timeHtml = item.lapTimes.map((t, index) => `<div>Lap ${index + 1}: ${t}</div>`).join('');
                 }
@@ -318,7 +319,7 @@
                 $("th:nth-child(3), td:nth-child(3)").show();
             }
         }
-              
+
                 function toggleListenerState(start) {
                     isRunning = start;
                     if (start) {
