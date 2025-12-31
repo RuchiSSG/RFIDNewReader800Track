@@ -5,7 +5,17 @@
     var events = Model.Events;
 }
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+    @@media print {
+        button, .btn, .alert {
+            display: none !important;
+        }
 
+        body {
+            margin: 20px;
+        }
+    }
+</style>
 <div class="d-flex justify-content-end mb-3">
     <button id="resetButton" type="button" class="btn btn-warning me-2">Reset</button>
     <a href="@Url.Action("Login", "Account")" class="btn btn-outline-danger">Logout</a>
@@ -13,7 +23,9 @@
         Print
     </button> *@
 </div>
-
+<button type="button" class="btn btn-secondary" onclick="printPage()">
+    Print
+</button>
 <h2>RFID Reader Section</h2>
 <div class="alert alert-info">
     <strong>Notice:</strong> You have been redirected here because the IP Address is already registered!
@@ -295,6 +307,11 @@
                     timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
                     lapCount = ""; // Hide lap count
                 }
+                 else  if (eventName == "500 meter Running") {
+                    // Show only latest time for 800m
+                    timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
+                    lapCount = ""; // Hide lap count
+                }
                else {
                     // Show each lap with "Lap x: timestamp"
                     timeHtml = item.lapTimes.map((t, index) => `<div>Lap ${index + 1}: ${t}</div>`).join('');
@@ -439,6 +456,9 @@
                     });
                 });
             });
+                function printPage() {
+            window.print();
+        }
     </script>
 
 

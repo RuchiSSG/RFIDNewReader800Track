@@ -6,7 +6,20 @@
     var events = Model.Events;
     var ipAddress = string.Join(", ", Model.ReaderIPs);
 }
+<style>
+    @@media print {
+        button, .btn, .alert
 
+    {
+        display: none !important;
+    }
+
+    body {
+        margin: 20px;
+    }
+
+    }
+</style>
 <h2>RFID Reader Configuration</h2>
 
 @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -15,6 +28,8 @@
         @Model.StatusMessage
     </div>
 }
+
+
 <div class="row">
     <div class="col-md-6">
         <div class="shadow-sm p-3 mb-5 bg-white rounded">
@@ -53,6 +68,9 @@
                 <input type="hidden" id="access_token" value="@ViewData["AccessToken"]" />
                 <button type="submit" class="btn btn-primary" onclick="SubmitButton(event)">Submit</button>
                 <button id="resetButton" type="button" class="btn btn-warning me-2" onclick="window.location.href='@Url.Action("Login", "Account")'">Back</button>
+                <button type="button" class="btn btn-secondary" onclick="printPage()">
+                    Print
+                </button>
             </form>
         </div>
     </div>
@@ -152,6 +170,8 @@
 
                 return false; // Prevent form submission
             }
-
+              function printPage() {
+        window.print();
+    }
     </script>
 }

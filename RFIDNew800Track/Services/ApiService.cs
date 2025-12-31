@@ -52,7 +52,7 @@ namespace RFIDReaderPortal.Services
 
             throw new Exception("Failed to fetch recruitment events.");
         }
-
+            
         public async Task<object> GetAllCategorysync(string accessToken, string userid, string recruitid)
         {
             var url = $"{_baseUrl}CategoryMaster/GetAll?userid={userid}&recConfId={recruitid}";
@@ -127,7 +127,7 @@ namespace RFIDReaderPortal.Services
                     }).ToList();
 
                 // Decide lap count based on event
-                int totalLaps = eventName == "1600 Meter Running" ? 2 : 1;
+                int totalLaps = eventName == "1600 Meter Running" ? 1 : 1;
                              // eventName == "800 Meter Running" ? 3 :
                               
 
