@@ -107,7 +107,7 @@ namespace RFIDReaderPortal.Services
             }
             throw new Exception("Failed to fetch recruitment events.");
         }
-        public async Task<bool> PostRFIDRunningLogAsync(
+        public async Task<List<RFIDChestNoMappingDto>> PostRFIDRunningLogAsync(
             string accessToken, string userid, string recruitid, string DeviceId,
             string Location, string eventName, string eventId, List<RfidData> rfidDataList,
             string sessionid, string ipaddress)
@@ -119,30 +119,32 @@ namespace RFIDReaderPortal.Services
 
                 // Group by TagId
                 var groupedData = rfidDataList
-                    .GroupBy(x => x.TagId)
-                    .Select(g => new
-                    {
-                        TagId = g.Key,
-                        Laps = g.OrderBy(x => x.Timestamp).ToList()
-                    }).ToList();
+                 .GroupBy(x => x.TagId)
+                 .Select(g => new
+                 {
+                     TagId = g.Key,
+                     Laps = g.OrderBy(x => x.Timestamp).ToList()
+                 }).ToList();
 
-                // Decide lap count based on event
-                int totalLaps = eventName == "1600 Meter Running" ? 1 : 1;
-                             // eventName == "800 Meter Running" ? 3 :
-                              
+                //// Decide lap count based on event
+                //int totalLaps = eventName == "1600 Meter Running" ? 1 : 1;
+                //// eventName == "800 Meter Running" ? 3 :
+
 
                 // Prepare final request data
-                var requestData = groupedData.Select(x => new
+                var requestData = rfidDataList.Select(x => new
                 {
                     RFIDdtagata = x.TagId,
-                    Lap1 = x.Laps.Count >= 1 ? x.Laps[0].Timestamp.ToString("HH:mm:ss:fff") : null,
-                    Lap2 = x.Laps.Count >= 2 ? x.Laps[1].Timestamp.ToString("HH:mm:ss:fff") : null,
-                    //Lap3 = x.Laps.Count >= 3 ? x.Laps[2].Timestamp.ToString("HH:mm:ss:fff") : null,
-                    //Lap4 = x.Laps.Count >= 4 ? x.Laps[3].Timestamp.ToString("HH:mm:ss:fff") : null,
-                    //Lap5 = x.Laps.Count >= 5 ? x.Laps[4].Timestamp.ToString("HH:mm:ss:fff") : null,
 
+                    Lap1 = x.LapTimes.Count >= 1 ? x.LapTimes[0].ToString("HH:mm:ss:fff") : null,
+                    Lap2 = x.LapTimes.Count >= 2 ? x.LapTimes[1].ToString("HH:mm:ss:fff") : null,
+                    //Lap3 = x.LapTimes.Count >= 3 ? x.LapTimes[2].ToString("HH:mm:ss:fff") : null,
+                    //Lap4 = x.LapTimes.Count >= 4 ? x.LapTimes[3].ToString("HH:mm:ss:fff") : null,
+                    //Lap5 = x.LapTimes.Count >= 5 ? x.LapTimes[4].ToString("HH:mm:ss:fff") : null,
 
-                    TotalLaps = totalLaps,
+                    TotalLaps =
+         eventName == "1600 Meter Running" ? 1 : 1,
+
                     EventName = eventName
                 }).ToList();
 
@@ -153,15 +155,54 @@ namespace RFIDReaderPortal.Services
 
                 var response = await _httpClient.SendAsync(request);
 
-                return response.IsSuccessStatusCode;
+               
+                if (!response.IsSuccessStatusCode)
+                    return new List<RFIDChestNoMappingDto>();
+
+                // ✅ Insert success → CALL GET ALL
+                return await GetAllRFIDRunningLogAsync(accessToken, userid, recruitid, eventId, eventName, sessionid, ipaddress);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while inserting RFID data");
-                return false;
+                //return false;
+                return new List<RFIDChestNoMappingDto>();
             }
         }
+        public async Task<List<RFIDChestNoMappingDto>> GetAllRFIDRunningLogAsync(
+    string accessToken,
+    string userid,
+    string recruitid,
+    string eventId,
+    string eventName,
+    string sessionid,
+    string ipaddress)
+        {
+            try
+            {
+                var url = $"{_baseUrl}RFIDChestNoMapping/GetChestno?userid={userid}&recruitid={recruitid}&eventId={eventId}&eventName={eventName}&sessionid={sessionid}&ipaddress={ipaddress}";
 
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization =
+                    new AuthenticationHeaderValue("Bearer", accessToken);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return new List<RFIDChestNoMappingDto>();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<RFIDChestNoMappingDto>>>(json);
+
+                return apiResponse?.data ?? new List<RFIDChestNoMappingDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while fetching chest barcode data");
+                return new List<RFIDChestNoMappingDto>();
+            }
+        }
 
         //public async Task<bool> PostRFIDRunningLogAsync(string accessToken, string userid, string recruitid, string DeviceId, string Location, string eventName, List<RfidData> rfidDataList, string sessionid, string ipaddress)
         //{

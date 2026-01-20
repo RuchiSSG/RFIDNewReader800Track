@@ -53,8 +53,10 @@ namespace RFIDReaderPortal.Controllers
 
 
         public async Task<IActionResult> Configuration()
+
         {
             try
+
             {
                 var httpClient = new HttpClient();
                 ApiService apiservice = new ApiService(httpClient, _configuration, _logger);
@@ -139,15 +141,16 @@ namespace RFIDReaderPortal.Controllers
 
                 foreach (var item in ipDataResponse)
                 {
-                    //if (!string.IsNullOrEmpty(item.EventId))
-                    //    Response.Cookies.Append("EventId", item.eventName);
                     if (!string.IsNullOrEmpty(item.Location))
                         Response.Cookies.Append("Location", item.Location);
+
                     if (!string.IsNullOrEmpty(item.eventName))
                         Response.Cookies.Append("EventName", item.eventName);
-                    if (!string.IsNullOrEmpty(item.eventName))
+
+                    if (!string.IsNullOrEmpty(item.EventId))
                         Response.Cookies.Append("EventId", item.EventId);
                 }
+
 
                 if (ipDataResponse.Count == 0)
                 {
@@ -177,8 +180,9 @@ namespace RFIDReaderPortal.Controllers
         }
 
 
+
         [HttpPost]
-        [Consumes("application/json")] // Expecting JSON content
+        [Consumes("application/json")]
         public async Task<IActionResult> SubmitButton([FromBody] DeviceConfigurationDto formData)
         {
             try
@@ -188,44 +192,48 @@ namespace RFIDReaderPortal.Controllers
                 string sesionid = Request.Cookies["sessionid"];
 
                 if (string.IsNullOrEmpty(accessToken))
-                {
                     return BadRequest("Access token is missing.");
-                }
 
-                ViewData["AccessToken"] = accessToken;
+                // 🔴 STEP 1: CLEAR OLD RACE COOKIES
+                ClearRaceCookies();
 
                 if (formData == null ||
                     string.IsNullOrEmpty(formData.DeviceId) ||
                     string.IsNullOrEmpty(formData.EventId) ||
                     string.IsNullOrEmpty(formData.Location) ||
                     string.IsNullOrEmpty(formData.UserId) ||
+                    string.IsNullOrEmpty(formData.eventName) ||
                     string.IsNullOrEmpty(formData.RecruitId))
                 {
                     return BadRequest("All input fields are required.");
                 }
 
-                dynamic InsertRFID = await _apiService.InsertDeviceConfigurationAsync(accessToken, formData, sesionid, ipaddress);
+                var response = await _apiService.InsertDeviceConfigurationAsync(
+                    accessToken, formData, sesionid, ipaddress);
 
-                string newTokenFromGetAsync = InsertRFID?.outcome?.tokens?.ToString();
-                if (!string.IsNullOrEmpty(newTokenFromGetAsync))
+                string token = response?.outcome?.tokens?.ToString();
+
+                if (!string.IsNullOrEmpty(token))
                 {
-                    ViewBag.Tokens = newTokenFromGetAsync;
-                    Response.Cookies.Append("accesstoken", newTokenFromGetAsync);
-                    accessToken = newTokenFromGetAsync;
+                    Response.Cookies.Append("accesstoken", token);
                 }
 
-                string Eventid = formData.EventId;
-                string Location = formData.Location;
-                Response.Cookies.Append("EventName", Eventid);
-                Response.Cookies.Append("Location", Location);
+
+                // 🔴 STEP 2: SET NEW RACE COOKIES
+                Response.Cookies.Append("EventId", formData.EventId);
+                Response.Cookies.Append("EventName", formData.eventName);
+                Response.Cookies.Append("Location", formData.Location);
+                Response.Cookies.Append("DeviceId", formData.DeviceId);
+
                 return Json(new { success = true, redirectUrl = Url.Action("Reader", "RFID") });
             }
-            catch (Exception ex)
+            catch
             {
-                //  _logger.LogError(ex, "Error occurred in SubmitButton");
                 return StatusCode(500, "Internal server error");
             }
         }
+
+
 
         [HttpPost]
         public async Task<IActionResult> RFID(EventModel model)
@@ -303,12 +311,28 @@ namespace RFIDReaderPortal.Controllers
         [HttpPost]
         public async Task<IActionResult> Stop()
         {
-            // Stop the listener so no new data comes in
             _tcpListenerService.Stop();
-            await _tcpListenerService.InsertStoredRfidDataAsync(); // Call method to insert data
 
-            return Json(new { success = true, message = "RFID listener stopped and data inserted successfully." });
+            var data = await _tcpListenerService.InsertStoredRfidDataAsync();
+
+            return Json(new
+            {
+                success = data != null && data.Any(),
+                message = "RFID data saved successfully",
+                result = data
+            });
         }
+
+
+        //[HttpPost]
+        //public async Task<IActionResult> Stop()
+        //{
+        //    // Stop the listener so no new data comes in
+        //    _tcpListenerService.Stop();
+        //    await _tcpListenerService.InsertStoredRfidDataAsync(); // Call method to insert data
+
+        //    return Json(new { success = true, message = "RFID listener stopped and data inserted successfully." });
+        //}
 
         public async Task<IActionResult> Reader()
         {
@@ -327,6 +351,11 @@ namespace RFIDReaderPortal.Controllers
                 if (!_tcpListenerService.IsRunning)
                 {
                     _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, eventId, sesionid, ipaddress);
+                    if (string.IsNullOrEmpty(eventId) || string.IsNullOrEmpty(deviceId))
+                    {
+                        return RedirectToAction("Configuration");
+                    }
+
                     _tcpListenerService.Start();
                 }
 
@@ -487,6 +516,24 @@ namespace RFIDReaderPortal.Controllers
                 hexString = hexStringArray
             });
         }
+        private void ClearRaceCookies()
+        {
+            string[] cookiesToClear =
+            {
+        "EventId",
+        "EventName",
+        "Location",
+        "DeviceId"
+    };
+
+            foreach (var cookie in cookiesToClear)
+            {
+                if (Request.Cookies[cookie] != null)
+                {
+                    Response.Cookies.Delete(cookie);
+                }
+            }
+        }
 
 
 
@@ -522,7 +569,7 @@ namespace RFIDReaderPortal.Controllers
                 _tcpListenerService.Stop();
                 _latestRfidData.Clear();
                 _lastClearTime = DateTime.MinValue;
-
+                ClearRaceCookies();
                 return Json(new { success = true, message = "RFID records deleted successfully and listener reset." });
                 //}
                 //else

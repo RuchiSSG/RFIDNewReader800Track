@@ -19,7 +19,7 @@ namespace RFIDReaderPortal.Services
 
         Task<dynamic> InsertDeviceConfigurationAsync(string accessToken, DeviceConfigurationDto formData, string sesionid, string ipaddress);
         Task<DeleteRfid> DeleteRFIDRecordsAsync(string accessToken, string userid, string recruitid, string deviceId, string location, string eventName,string eventId, string sessionid, string ipaddress);
-        Task<bool> PostRFIDRunningLogAsync(string accessToken, string userid, string recruitid, string DeviceId, string Location, string eventName, string eventId, List<RfidData> rfidDataList, string sessionid, string ipaddress);
+        Task<List<RFIDChestNoMappingDto>> PostRFIDRunningLogAsync(string accessToken, string userid, string recruitid, string DeviceId, string Location, string eventName, string eventId, List<RfidData> rfidDataList, string sessionid, string ipaddress);
 
     }
 }

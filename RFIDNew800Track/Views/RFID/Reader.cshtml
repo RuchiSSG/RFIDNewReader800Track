@@ -19,13 +19,11 @@
 <div class="d-flex justify-content-end mb-3">
     <button id="resetButton" type="button" class="btn btn-warning me-2">Reset</button>
     <a href="@Url.Action("Login", "Account")" class="btn btn-outline-danger">Logout</a>
-    @*  <button id="printButton" type="button" class="btn btn-primary">
+    <button type="button" class="btn btn-secondary" onclick="printPage()" style="margin-left: 10px">
         Print
-    </button> *@
+    </button>
 </div>
-<button type="button" class="btn btn-secondary" onclick="printPage()">
-    Print
-</button>
+
 <h2>RFID Reader Section</h2>
 <div class="alert alert-info">
     <strong>Notice:</strong> You have been redirected here because the IP Address is already registered!
@@ -175,6 +173,28 @@
     </table>
 </div>
 
+<div class="container mt-5">
+    <h1 class="mt-4 text-success">Data</h1>
+
+    <table class="table table-bordered table-success">
+        <thead>
+            <tr>
+                <th>Sr. No.</th>
+                <th>Barcode No</th>
+                <th>Chest No</th>
+                <th>RFID</th>
+                <th>Position</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+
+        <tbody id="finalResultBody">
+            <tr>
+                <td colspan="6">Data will appear here after Stop</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 @* <div class="container">
     <h1 class="mt-4">RFID Data</h1>
@@ -207,121 +227,159 @@
     </table>
 </div> *@
 
-<button id="stopButton" type="button" class="btn btn-danger" disabled>Stop</button>
+<button id="stopButton" type="button" class="btn btn-danger" disabled>Stop and Save</button>
 <button id="startButton" type="button" class="btn btn-success">Start</button>
 <button id="clearButton" type="button" class="btn btn-warning" disabled>Clear Data</button>
 
 @section Scripts {
     <script>
-        // Configure toastr
-        toastr.options = {
-            "closeButton": true,
-            "progressBar": true,
-            "positionClass": "toast-top-right",
-            "timeOut": "5000"
-        };
+                // Configure toastr
+                toastr.options = {
+                    "closeButton": true,
+                    "progressBar": true,
+                    "positionClass": "toast-top-right",
+                    "timeOut": "5000"
+                };
 
-        // Success message after login
-        @if (TempData["SuccessMessage"] != null)
-        {
-                    <text>
-                        toastr.success('@TempData["SuccessMessage"]');
-                    </text>
-        }
+                // Success message after login
+                @if (TempData["SuccessMessage"] != null)
+                {
+                            <text>
+                                toastr.success('@TempData["SuccessMessage"]');
+                            </text>
+                }
 
-            $(document).ready(function () {
-                let updateInterval;
-                let isRunning = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.IsRunning));
+                    $(document).ready(function () {
+                        let updateInterval;
+                        let isRunning = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.IsRunning));
 
 
-                $('#clearButton').click(function () {
-                    $.ajax({
-                        url: '@Url.Action("ClearData", "RFID")',
-                        type: 'POST',
-                        success: function (response) {
-                            if (response.success) {
-                                $('#rfidDataBody').empty();
-                                $('#debugInfo').text('Data cleared successfully.');
-                            } else {
-                                $('#debugInfo').text('Failed to clear data.');
-                            }
-                        },
-                        error: function (xhr, status, error) {
-                            console.error('Error clearing data:', error);
-                            $('#debugInfo').text('Error clearing data: ' + error);
-                        }
-                    });
-                });
-
-                function updateRfidData() {
+                        $('#clearButton').click(function () {
+                            $.ajax({
+                                url: '@Url.Action("ClearData", "RFID")',
+                                type: 'POST',
+                                success: function (response) {
+                                    if (response.success) {
+                                        $('#rfidDataBody').empty();
+                                        $('#debugInfo').text('Data cleared successfully.');
+                                    } else {
+                                        $('#debugInfo').text('Failed to clear data.');
+                                    }
+                                },
+                                error: function (xhr, status, error) {
+                                    console.error('Error clearing data:', error);
+                                    $('#debugInfo').text('Error clearing data: ' + error);
+                                }
+                            });
+                        });
+                                function updateRfidData() {
                     if (!isRunning) return;
 
                     $.ajax({
                         url: '@Url.Action("GetData", "RFID")',
                         type: 'GET',
                         dataType: 'json',
-                        success: function (response) {
-                            $('#debugInfo').text('Data received: ' + response.rfidDataArray.length + ' items');
+                        success: function(response) {
                             updateTable(response.rfidDataArray);
                         },
-                        error: function (xhr, status, error) {
-                            console.error('Error fetching RFID data:', error);
-                            $('#debugInfo').text('Error fetching data: ' + error);
-                        },
-                        complete: function () {
-                            if (isRunning) {
-                                updateInterval = setTimeout(updateRfidData, 150);
-                            }
+                        complete: function() {
+                            if (isRunning) setTimeout(updateRfidData, 150);
                         }
                     });
                 }
-                        function updateTable(data) {
-            const $body = $('#rfidDataBody');
-            $body.empty();
 
+
+                        // function updateRfidData() {
+                        //     if (!isRunning) return;
+
+                        //     $.ajax({
+                        //         url: '@Url.Action("GetData", "RFID")',
+                        //         type: 'GET',
+                        //         dataType: 'json',
+                        //         success: function (response) {
+                        //             $('#debugInfo').text('Data received: ' + response.rfidDataArray.length + ' items');
+                        //             updateTable(response.rfidDataArray);
+                        //         },
+                        //         error: function (xhr, status, error) {
+                        //             console.error('Error fetching RFID data:', error);
+                        //             $('#debugInfo').text('Error fetching data: ' + error);
+                        //         },
+                        //         complete: function () {
+                        //             if (isRunning) {
+                        //                 updateInterval = setTimeout(updateRfidData, 150);
+                        //             }
+                        //         }
+                        //     });
+                        // }
+                function renderFinalResult(data) {
+
+                    const $body = $('#finalResultBody');
+                    $body.empty();
+
+                    if (!data || data.length === 0) {
+                        $body.append('<tr><td colspan="6">No data available</td></tr>');
+                        return;
+                    }
+
+                    let srNo = 1;
+
+                    data.forEach(item => {
+                        $body.append(`
+                            <tr>
+                                <td>${srNo}</td>
+                                <td>${item.barcode ||item.barcode || '-'}</td>           <!-- Barcode -->
+                                <td>${item.chestNo ||item.chestNo || '-'}</td>           <!-- Chest No -->
+                                <td>${item.tagId || item.rfid || '-'}</td><!-- RFID -->
+                                <td>${item.position ||item.position || '-'}</td>          <!-- Start / End -->
+                                <td>${item.finalTime || item.currentDateTime || '-'}</td>
+                            </tr>
+                        `);
+                        srNo++;
+                    });
+                }
+
+
+
+
+
+                      function updateTable(data) {
+            const $body = $('#rfidDataBody');
+            const eventName = $("#eventName").val();
+
+            // ❌ Empty data → kuch bhi mat karo (first poll safe)
             if (!data || data.length === 0) {
-                $body.append(`<tr><td colspan="4">No data available</td></tr>`);
                 return;
             }
 
-            const eventName = $("#eventName").val();
-
-            const grouped = {};
-            data.forEach(item => {
-                grouped[item.tagId] = item; // always latest
-            });
-
+            $body.empty();
             let srNo = 1;
-            Object.values(grouped).forEach(item => {
 
-                let lapCount = item.lapTimes.length;
+            data.forEach(item => {
+
+                let lapTimes = item.lapTimes || [];
+                let lapCount = lapTimes.length;
                 let timeHtml = "";
 
-                if (eventName == "100 Meter Running") {
-                    // Show only latest time for 100m
-                    timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
-                    lapCount = ""; // Hide lap count
+                // 🔹 FIRST SCAN (no lap time yet)
+                if (lapCount === 0) {
+                    timeHtml = `<div class="text-muted fw-bold">Started</div>`;
                 }
-              else  if (eventName == "800 Meter Running") {
-                    // Show only latest time for 800m
-                    timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
-                    lapCount = ""; // Hide lap count
+                // 🔹 100m / 500m → only latest time
+                else if (eventName === "100 Meter Running" || eventName === "500 meter Running") {
+                    timeHtml = `<div>${lapTimes[lapCount - 1]}</div>`;
                 }
-                 else  if (eventName == "500 meter Running") {
-                    // Show only latest time for 800m
-                    timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
-                    lapCount = ""; // Hide lap count
-                }
-               else {
-                    // Show each lap with "Lap x: timestamp"
-                    timeHtml = item.lapTimes.map((t, index) => `<div>Lap ${index + 1}: ${t}</div>`).join('');
+                // 🔹 Multi-lap events
+                else {
+                    timeHtml = lapTimes
+                        .map((t, i) => `<div>Lap ${i + 1}: ${t}</div>`)
+                        .join('');
                 }
 
                 $body.append(`
                     <tr>
                         <td>${srNo}</td>
                         <td>${item.tagId}</td>
-                        <td>${lapCount}</td>
+                        <td>${(eventName === "100 Meter Running" || eventName === "500 meter Running") ? "" : lapCount}</td>
                         <td>${timeHtml}</td>
                     </tr>
                 `);
@@ -329,136 +387,217 @@
                 srNo++;
             });
 
-            // Hide lap count column for 100m
-            if (eventName === "100 Meter Running") {
-                $("th:nth-child(3), td:nth-child(3)").hide();
-            } else {
-                $("th:nth-child(3), td:nth-child(3)").show();
-            }
+            // 🔹 Hide lap column for 100m / 500m
+                    if (eventName === "100 Meter Running" || eventName === "500 meter Running") {
+                    $("#rfidDataBody").closest('table').find("th:nth-child(3), td:nth-child(3)").hide();
+                } else {
+                    $("#rfidDataBody").closest('table').find("th:nth-child(3), td:nth-child(3)").show();
+                }
         }
 
-                function toggleListenerState(start) {
-                    isRunning = start;
-                    if (start) {
-                        // First clear data
-                        $.ajax({
-                            url: '@Url.Action("ClearData", "RFID")',
-                            type: 'POST',
-                            success: function (response) {
-                                if (response.success) {
-                                    $('#rfidDataBody').empty();
-                                    $('#debugInfo').text('Data cleared successfully. Starting RFID listener...');
 
-                                    // Now start listening
-                                    updateRfidData();
-                                    $('#startButton').prop('disabled', true);
-                                    $('#stopButton').prop('disabled', false);
-                                    $('#clearButton').prop('disabled', true);
-                                } else {
-                                    $('#debugInfo').text('Failed to clear data.');
-                                }
-                            },
-                            error: function (xhr, status, error) {
-                                console.error('Error clearing data:', error);
-                                $('#debugInfo').text('Error clearing data: ' + error);
+                //                 function updateTable(data) {
+                //     const $body = $('#rfidDataBody');
+                //     $body.empty();
+
+                //     if (!data || data.length === 0) {
+                //         $body.append(`<tr><td colspan="4">No data available</td></tr>`);
+                //         return;
+                //     }
+
+                //     const eventName = $("#eventName").val();
+
+                //     const grouped = {};
+                //            data.forEach(item => {
+                //     if (item.lapTimes && item.lapTimes.length > 0) {
+                //         grouped[item.tagId] = item;
+                //     }
+                // });
+                //     let srNo = 1;
+                //     Object.values(grouped).forEach(item => {
+
+                //         let lapCount = item.lapTimes.length;
+                //         let timeHtml = "";
+
+                //         if (eventName == "100 Meter Running") {
+                //             // Show only latest time for 100m
+                //             timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
+                //             lapCount = ""; // Hide lap count
+                //         }
+                //          if (eventName == "500 meter Running") {
+                //             // Show only latest time for 100m
+                //             timeHtml = `<div>${item.lapTimes[item.lapTimes.length - 1]}</div>`;
+                //             lapCount = ""; // Hide lap count
+                //         }
+                //        else {
+                //             // Show each lap with "Lap x: timestamp"
+                //             timeHtml = item.lapTimes.map((t, index) => `<div>Lap ${index + 1}: ${t}</div>`).join('');
+                //         }
+
+                //         $body.append(`
+                //             <tr>
+                //                 <td>${srNo}</td>
+                //                 <td>${item.tagId}</td>
+                //                 <td>${lapCount}</td>
+                //                 <td>${timeHtml}</td>
+                //             </tr>
+                //         `);
+
+                //         srNo++;
+                //     });
+
+                //     // Hide lap count column for 100m
+                //     if (eventName === "100 Meter Running") {
+                //         $("th:nth-child(3), td:nth-child(3)").hide();
+                //     } else {
+                //         $("th:nth-child(3), td:nth-child(3)").show();
+                //     }
+                // }
+
+
+
+
+
+                        function toggleListenerState(start) {
+                            isRunning = start;
+                            if (start) {
+                                // First clear data
+                                $.ajax({
+                                    url: '@Url.Action("ClearData", "RFID")',
+                                    type: 'POST',
+                                    success: function (response) {
+                                        if (response.success) {
+                                            $('#rfidDataBody').empty();
+                                            $('#debugInfo').text('Data cleared successfully. Starting RFID listener...');
+
+                                            // Now start listening
+                                            updateRfidData();
+                                            $('#startButton').prop('disabled', true);
+                                            $('#stopButton').prop('disabled', false);
+                                            $('#clearButton').prop('disabled', true);
+                                        } else {
+                                            $('#debugInfo').text('Failed to clear data.');
+                                        }
+                                    },
+                                    error: function (xhr, status, error) {
+                                        console.error('Error clearing data:', error);
+                                        $('#debugInfo').text('Error clearing data: ' + error);
+                                    }
+                                });
+                            } else {
+                                $('#debugInfo').text('RFID listener stopped');
+                                $('#startButton').prop('disabled', false);
+                                $('#stopButton').prop('disabled', true);
+                                $('#clearButton').prop('disabled', false);
+                                previousTagIds = [];
+                            }
+                        }
+
+                        $('#startButton').click(function () {
+                            if (!isRunning) {
+                                toggleListenerState(true);
                             }
                         });
-                    } else {
-                        $('#debugInfo').text('RFID listener stopped');
-                        $('#startButton').prop('disabled', false);
-                        $('#stopButton').prop('disabled', true);
-                        $('#clearButton').prop('disabled', false);
-                        previousTagIds = [];
-                    }
-                }
 
-                $('#startButton').click(function () {
-                    if (!isRunning) {
-                        toggleListenerState(true);
-                    }
-                });
+                                               $('#stopButton').click(function () {
+                    $.ajax({
+                        url: '@Url.Action("Stop", "RFID")',
+                        type: 'POST',
+                        success: function (response) {
+                            if (response.success) {
+                                toggleListenerState(false);
 
-
-
-                $('#stopButton').click(function () {
-                    $.post('@Url.Action("Stop", "RFID")', function (response) {
-                        if (response.success) {
-                            $('#debugInfo').text(response.message);
-                        } else {
-                            $('#debugInfo').text('Failed to insert RFID data.');
+                                // ✅ Final DB data → FINAL TABLE ONLY
+                                renderFinalResult(response.result);
+                            }
                         }
-                        toggleListenerState(false);
-                    }).fail(function (xhr, status, error) {
-                        console.error('Error stopping listener:', error);
-                        $('#debugInfo').text('Error stopping listener: ' + error);
                     });
                 });
 
 
 
-                $('#clearButton').click(function () {
-                    $('#rfidDataBody').empty().append('<tr><td colspan="2">No data available</td></tr>');
-                    $('#debugInfo').text('RFID data cleared');
-                    previousTagIds = [];
-                });
 
-                if (isRunning) {
-                    toggleListenerState(true);
-                } else {
-                    $('#debugInfo').text('Click "Start" to begin listening for RFID data');
-                }
 
-                $('#resetButton').click(function (event) {
-                    Swal.fire({
-                        title: 'Are you sure?',
-                        text: 'You won\'t be able to undo this!',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: 'Yes, reset it!'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            $.ajax({
-                                url: '@Url.Action("Reset", "RFID")',
-                                type: 'POST',
-                                success: function (response) {
-                                    if (response.success) {
-                                        $('#debugInfo').text(response.message);
-                                        console.log(response.message);
-                                        Swal.fire(
-                                            'Reset!',
-                                            'Reset successful!',
-                                            'success'
-                                        );
-                                    } else {
-                                        $('#debugInfo').text('Error resetting system.');
-                                        Swal.fire(
-                                            'Error!',
-                                            'There was an issue resetting the system.',
-                                            'error'
-                                        );
-                                    }
-                                },
-                                error: function (xhr, status, error) {
-                                    console.error('Error occurred while resetting:', error);
-                                    $('#debugInfo').text('An error occurred while resetting.');
-                                    Swal.fire(
-                                        'Error!',
-                                        'An error occurred while resetting the system.',
-                                        'error'
-                                    );
+
+                        // $('#stopButton').click(function () {
+                        //     $.post('@Url.Action("Stop", "RFID")', function (response) {
+                        //         if (response.success) {
+                        //             $('#debugInfo').text(response.message);
+                        //         } else {
+                        //             $('#debugInfo').text('Failed to insert RFID data.');
+                        //         }
+                        //         toggleListenerState(false);
+                        //     }).fail(function (xhr, status, error) {
+                        //         console.error('Error stopping listener:', error);
+                        //         $('#debugInfo').text('Error stopping listener: ' + error);
+                        //     });
+                        // });
+
+
+
+                        $('#clearButton').click(function () {
+                            $('#rfidDataBody').empty().append('<tr><td colspan="2">No data available</td></tr>');
+                            $('#debugInfo').text('RFID data cleared');
+                            previousTagIds = [];
+                        });
+
+                        if (isRunning) {
+                            toggleListenerState(true);
+                        } else {
+                            $('#debugInfo').text('Click "Start" to begin listening for RFID data');
+                        }
+
+                        $('#resetButton').click(function (event) {
+                            Swal.fire({
+                                title: 'Are you sure?',
+                                text: 'You won\'t be able to undo this!',
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: '#3085d6',
+                                cancelButtonColor: '#d33',
+                                confirmButtonText: 'Yes, reset it!'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    $.ajax({
+                                        url: '@Url.Action("Reset", "RFID")',
+                                        type: 'POST',
+                                        success: function (response) {
+                                            if (response.success) {
+                                                $('#debugInfo').text(response.message);
+                                                console.log(response.message);
+                                                Swal.fire(
+                                                    'Reset!',
+                                                    'Reset successful!',
+                                                    'success'
+                                                );
+                                            } else {
+                                                $('#debugInfo').text('Error resetting system.');
+                                                Swal.fire(
+                                                    'Error!',
+                                                    'There was an issue resetting the system.',
+                                                    'error'
+                                                );
+                                            }
+                                        },
+                                        error: function (xhr, status, error) {
+                                            console.error('Error occurred while resetting:', error);
+                                            $('#debugInfo').text('An error occurred while resetting.');
+                                            Swal.fire(
+                                                'Error!',
+                                                'An error occurred while resetting the system.',
+                                                'error'
+                                            );
+                                        }
+                                    });
+                                } else {
+                                    console.log("Reset canceled by the user.");
                                 }
                             });
-                        } else {
-                            console.log("Reset canceled by the user.");
-                        }
+                        });
                     });
-                });
-            });
-                function printPage() {
-            window.print();
-        }
+                                function printPage() {
+                    window.print();
+                }
     </script>
 
 

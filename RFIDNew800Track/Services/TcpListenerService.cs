@@ -11,11 +11,13 @@ namespace RFIDReaderPortal.Services
     {
         private TcpListener _tcpListener;
         private ConcurrentDictionary<string, RfidData> _receivedDataDict;
+        private readonly ConcurrentDictionary<string, DateTime> _lastProcessed = new();
+       
         private string[] _hexString;
         private int _hexdataCount;
         private readonly object _lock = new object();
         private readonly object _hexLock = new object();
-
+        private volatile bool _raceStarted = false;
         private string _accessToken;
         private string _userid;
         private string _recruitid;
@@ -83,25 +85,27 @@ namespace RFIDReaderPortal.Services
         }
         public void Stop()
         {
-            if (IsRunning)
-            {
-                IsRunning = false;
-                _tcpListener.Stop();
+            if (!IsRunning)
+                return;
 
-                lock (_storedRfidData)
+            IsRunning = false;
+            _tcpListener.Stop();
+
+            // ✅ SNAPSHOT FROM MAIN DICTIONARY
+            _snapshotData = _receivedDataDict.Values
+                .Where(d => d.LapTimes.Count > 0)
+                .Select(d => new RfidData
                 {
-                    _snapshotData = _storedRfidData
-                        .Select(d => new RfidData
-                        {
-                            TagId = d.TagId,
-                            Timestamp = d.Timestamp,
-                            LapTimes = new List<DateTime>(d.LapTimes)
-                        })
-                        .ToList();
-                }
+                    TagId = d.TagId,
+                    Timestamp = d.Timestamp,
+                    LapTimes = new List<DateTime>(d.LapTimes),
+                    IsCompleted = d.IsCompleted
+                })
+                .OrderBy(d => d.TagId)
+                .ToList();
 
-                _logger.LogInformation("TCP Listener stopped and snapshot taken.");
-            }
+            _logger.LogInformation(
+                $"TCP Listener stopped. Snapshot count = {_snapshotData.Count}");
         }
 
         //public void Stop()
@@ -113,6 +117,33 @@ namespace RFIDReaderPortal.Services
         //        _logger.LogInformation("TCP Listener stopped");
         //    }
         //}
+        public void StartRace()
+        {
+            _raceStarted = true;
+
+            // 🔥 CLEAR EVERYTHING BEFORE START
+            _receivedDataDict.Clear();
+            _lastProcessed.Clear();
+
+            while (_epcQueue.TryDequeue(out _)) { }
+
+            lock (_hexBuffer)
+            {
+                _hexBuffer.Clear();
+            }
+
+            _lastClearTime = DateTime.Now;
+
+            _logger.LogInformation("Race officially STARTED - old data cleared");
+        }
+
+
+
+        public void StopRace()
+        {
+            _raceStarted = false;
+            _logger.LogInformation("Race STOPPED");
+        }
 
         private async Task ListenAsync()
         {
@@ -144,12 +175,12 @@ namespace RFIDReaderPortal.Services
 
                 try
                 {
-                    //stream.ReadTimeout = 5000; // 5 second timeout 
+                    // stream.ReadTimeout = 5000; // 5 second timeout
 
                     while (client.Connected && IsRunning)
                     {
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                         
+
                         if (bytesRead <= 0)
                         {
                             _logger.LogInformation("Client disconnected");
@@ -169,7 +200,7 @@ namespace RFIDReaderPortal.Services
                                 _hexString[_hexdataCount++] = hexData;
                             }
                         }
-                        //  ProcessHexBuffer(hexData);
+                        //ProcessHexBuffer(hexData);
                         lock (_hexBuffer)
                         {
                             _hexBuffer.Append(hexData);
@@ -180,6 +211,7 @@ namespace RFIDReaderPortal.Services
 
                             ProcessHexBuffer(_hexBuffer);
                         }
+
                         // Append to buffer in case of fragmented messages
                         // clientBuffer.Append(hexData);
 
@@ -249,39 +281,47 @@ namespace RFIDReaderPortal.Services
                 return;
 
             string hex = buffer.ToString();
-            var epcs = ExtractEpcs(hex);
 
-            if (epcs.Count == 0)
-                return;
+            var matches = Regex.Matches(
+                hex,
+                @"E2801170000002[0-9A-F]{10}",
+                RegexOptions.IgnoreCase
+            );
 
             var now = DateTime.Now;
 
-            foreach (var epc in epcs)
+            foreach (Match m in matches)
             {
-                _epcQueue.Enqueue((epc, now)); // ✅ REAL READ TIME
+                _epcQueue.Enqueue((m.Value.ToUpperInvariant(), now));
             }
 
-            // keep only last unprocessed tail
-            if (buffer.Length > 200)
-                buffer.Remove(0, buffer.Length - 200);
+            // 🔒 KEEP LAST 48 CHARS ONLY (important for split EPC)
+            if (buffer.Length > 48)
+                buffer.Remove(0, buffer.Length - 48);
         }
         private void StartEpcProcessor()
         {
-            Task.Run(async () =>
+            int workers = Environment.ProcessorCount >= 4 ? 4 : 2;
+
+            for (int i = 0; i < workers; i++)
             {
-                while (IsRunning)
+                Task.Run(async () =>
                 {
-                    if (_epcQueue.TryDequeue(out var item))
+                    while (IsRunning)
                     {
-                        ProcessTag(item.epc, item.time); // ✅ exact time
+                        if (_epcQueue.TryDequeue(out var item))
+                        {
+                            ProcessTag(item.epc, item.time);
+                        }
+                        else
+                        {
+                            await Task.Delay(1);
+                        }
                     }
-                    else
-                    {
-                        await Task.Delay(1);
-                    }
-                }
-            });
+                });
+            }
         }
+
         //private void ProcessTag(string epc, DateTime timestamp)
         //{
         //    bool shouldStore = false;
@@ -436,112 +476,82 @@ namespace RFIDReaderPortal.Services
         //        }
         //    }
         //}
-
         private void ProcessTag(string epc, DateTime timestamp)
         {
-            bool shouldStore = false;
-            RfidData rfidData;
+            // ✅ PER-TAG DUPLICATE PREVENTION (FIRST LINE)
+            var lastTime = _lastProcessed.GetOrAdd(epc, DateTime.MinValue);
 
-            // 🔒 COMPLETED CHECK (SABSE UPAR)
-            if (_receivedDataDict.TryGetValue(epc, out var completedData)
-                && completedData.IsCompleted)
+            if (timestamp - lastTime < TimeSpan.FromMilliseconds(800))
+                return;
+
+            _lastProcessed[epc] = timestamp;
+
+            // Get or create tag entry (thread-safe)
+            var rfidData = _receivedDataDict.GetOrAdd(epc, _ =>
+                new RfidData
+                {
+                    TagId = epc,
+                    Timestamp = timestamp,
+                    LapTimes = new List<DateTime> { timestamp },
+                    IsCompleted = false
+                });
+
+            // 🔒 HARD STOP: already finished race
+            if (rfidData.IsCompleted)
             {
                 _logger.LogWarning(
                     $"Cheat prevention: Tag {epc} already completed race. Ignored.");
                 return;
             }
 
-            bool exists = _receivedDataDict.TryGetValue(epc, out rfidData);
+            bool shouldStore = false;
 
-            if (!exists)
+            // ================== CRITICAL SECTION ==================
+            lock (rfidData)  // 🔒 Only one thread can update this tag at a time
             {
-                rfidData = new RfidData
+                // ---------------- EVENT LOGIC ----------------
+                if (_eventName == "100 Meter Running" || _eventName == "500 meter Running" || _eventName == "800 Meter Running")
                 {
-                    TagId = epc,
-                    Timestamp = timestamp,
-                    LapTimes = new List<DateTime> { timestamp },
-                    IsCompleted = false
-                };
-
-                _receivedDataDict[epc] = rfidData;
-                shouldStore = true;
-            }
-
-            // DUPLICATE WINDOW CHECK
-            var timeSinceLastScan = timestamp - rfidData.Timestamp;
-
-            if (timeSinceLastScan <= _duplicatePreventionWindow)
-            {
-                _logger.LogDebug(
-                    $"Ignoring duplicate scan for {epc} within {_duplicatePreventionWindow.TotalSeconds}s");
-                return;
-            }
-
-            // ================== EVENT LOGIC ==================
-
-            if (_eventName == "100 Meter Running")
-            {
-                rfidData.Timestamp = timestamp;
-                rfidData.LapTimes.Clear();
-                rfidData.LapTimes.Add(timestamp);
-
-                rfidData.IsCompleted = true;   // 🔒 FINISH
-                shouldStore = true;
-
-                _logger.LogInformation($"100m completed for {epc}");
-            }
-            else if (_eventName == "800 Meter Running")
-            {
-                rfidData.Timestamp = timestamp;
-                rfidData.LapTimes.Clear();
-                rfidData.LapTimes.Add(timestamp);
-
-                rfidData.IsCompleted = true;   // 🔒 FINISH
-                shouldStore = true;
-
-                _logger.LogInformation($"800m completed for {epc}");
-            }
-            else if (_eventName == "500 meter running")
-            {
-                rfidData.Timestamp = timestamp;
-                rfidData.LapTimes.Clear();
-                rfidData.LapTimes.Add(timestamp);
-
-                rfidData.IsCompleted = true;   // 🔒 FINISH
-                shouldStore = true;
-
-                _logger.LogInformation($"500m completed for {epc}");
-            }
-            else if (_eventName == "1600 Meter Running")
-            {
-                int maxLaps = 2;
-                TimeSpan minGap = TimeSpan.FromSeconds(20);
-
-                if (rfidData.LapTimes.Count > 0)
-                {
-                    DateTime lastLap = rfidData.LapTimes.Last();
-                    if (timestamp - lastLap < minGap)
+                    if (rfidData.LapTimes.Count == 0)
                     {
-                        _logger.LogInformation(
-                            $"Ignored early lap for {epc}. Gap {(timestamp - lastLap).TotalSeconds}s");
-                        return;
+                        rfidData.Timestamp = timestamp;
+                        rfidData.LapTimes.Add(timestamp);
+                        rfidData.IsCompleted = true;
+                        shouldStore = true;
+
+                        _logger.LogInformation($"Final {_eventName} time captured for {epc}");
                     }
                 }
-
-                rfidData.Timestamp = timestamp;
-                rfidData.LapTimes.Add(timestamp);
-                shouldStore = true;
-
-                if (rfidData.LapTimes.Count >= maxLaps)
+                else if (_eventName == "1600 Meter Running")
                 {
-                    rfidData.IsCompleted = true; // 🔒 FINISH
+                    int maxLaps = 2;
+                    TimeSpan minGap = TimeSpan.FromSeconds(20);
+
+                    if (rfidData.LapTimes.Count > 0)
+                    {
+                        DateTime lastLap = rfidData.LapTimes.Last();
+                        if (timestamp - lastLap < minGap)
+                        {
+                            _logger.LogInformation(
+                                $"Ignored early lap for {epc}. Gap {(timestamp - lastLap).TotalSeconds}s");
+                            return;
+                        }
+                    }
+
+                    rfidData.Timestamp = timestamp;
+                    rfidData.LapTimes.Add(timestamp);
+                    shouldStore = true;
+
+                    if (rfidData.LapTimes.Count >= maxLaps)
+                    {
+                        rfidData.IsCompleted = true; // 🔒 FINISH
+                    }
+
+                    _logger.LogInformation($"1600m lap {rfidData.LapTimes.Count} for {epc}");
                 }
+            } // ================= END LOCK ==================
 
-                _logger.LogInformation(
-                    $"1600m lap {rfidData.LapTimes.Count} for {epc}");
-            }
-
-            // ================== STORE ==================
+            // ---------------- STORE SNAPSHOT ----------------
             if (shouldStore)
             {
                 lock (_storedRfidData)
@@ -556,6 +566,126 @@ namespace RFIDReaderPortal.Services
                 }
             }
         }
+
+        //private void ProcessTag(string epc, DateTime timestamp)
+        //{
+        //    bool shouldStore = false;
+        //    RfidData rfidData;
+
+        //    // 🔒 COMPLETED CHECK (SABSE UPAR)
+        //    if (_receivedDataDict.TryGetValue(epc, out var completedData)
+        //        && completedData.IsCompleted)
+        //    {
+        //        _logger.LogWarning(
+        //            $"Cheat prevention: Tag {epc} already completed race. Ignored.");
+        //        return;
+        //    }
+
+        //    bool exists = _receivedDataDict.TryGetValue(epc, out rfidData);
+
+        //    if (!exists)
+        //    {
+        //        rfidData = new RfidData
+        //        {
+        //            TagId = epc,
+        //            Timestamp = timestamp,
+        //            LapTimes = new List<DateTime> { timestamp },
+        //            IsCompleted = false
+        //        };
+
+        //        _receivedDataDict[epc] = rfidData;
+        //        shouldStore = true;
+        //    }
+
+        //    // DUPLICATE WINDOW CHECK
+        //    var timeSinceLastScan = timestamp - rfidData.Timestamp;
+
+        //    if (timeSinceLastScan <= _duplicatePreventionWindow)
+        //    {
+        //        _logger.LogDebug(
+        //            $"Ignoring duplicate scan for {epc} within {_duplicatePreventionWindow.TotalSeconds}s");
+        //        return;
+        //    }
+
+        //    // ================== EVENT LOGIC ==================
+
+        //    if (_eventName == "100 Meter Running")
+        //    {
+        //        rfidData.Timestamp = timestamp;
+        //        rfidData.LapTimes.Clear();
+        //        rfidData.LapTimes.Add(timestamp);
+
+        //        rfidData.IsCompleted = true;   // 🔒 FINISH
+        //        shouldStore = true;
+
+        //        _logger.LogInformation($"100m completed for {epc}");
+        //    }
+        //    else if (_eventName == "800 Meter Running")
+        //    {
+        //        rfidData.Timestamp = timestamp;
+        //        rfidData.LapTimes.Clear();
+        //        rfidData.LapTimes.Add(timestamp);
+
+        //        rfidData.IsCompleted = true;   // 🔒 FINISH
+        //        shouldStore = true;
+
+        //        _logger.LogInformation($"800m completed for {epc}");
+        //    }
+        //    else if (_eventName == "500 meter running")
+        //    {
+        //        rfidData.Timestamp = timestamp;
+        //        rfidData.LapTimes.Clear();
+        //        rfidData.LapTimes.Add(timestamp);
+
+        //        rfidData.IsCompleted = true;   // 🔒 FINISH
+        //        shouldStore = true;
+
+        //        _logger.LogInformation($"500m completed for {epc}");
+        //    }
+        //    else if (_eventName == "1600 Meter Running")
+        //    {
+        //        int maxLaps = 2;
+        //        TimeSpan minGap = TimeSpan.FromSeconds(20);
+
+        //        if (rfidData.LapTimes.Count > 0)
+        //        {
+        //            DateTime lastLap = rfidData.LapTimes.Last();
+        //            if (timestamp - lastLap < minGap)
+        //            {
+        //                _logger.LogInformation(
+        //                    $"Ignored early lap for {epc}. Gap {(timestamp - lastLap).TotalSeconds}s");
+        //                return;
+        //            }
+        //        }
+
+        //        rfidData.Timestamp = timestamp;
+        //        rfidData.LapTimes.Add(timestamp);
+        //        shouldStore = true;
+
+        //        if (rfidData.LapTimes.Count >= maxLaps)
+        //        {
+        //            rfidData.IsCompleted = true; // 🔒 FINISH
+        //        }
+
+        //        _logger.LogInformation(
+        //            $"1600m lap {rfidData.LapTimes.Count} for {epc}");
+        //    }
+
+        //    // ================== STORE ==================
+        //    if (shouldStore)
+        //    {
+        //        lock (_storedRfidData)
+        //        {
+        //            _storedRfidData.Add(new RfidData
+        //            {
+        //                TagId = rfidData.TagId,
+        //                Timestamp = rfidData.Timestamp,
+        //                LapTimes = new List<DateTime>(rfidData.LapTimes),
+        //                IsCompleted = rfidData.IsCompleted
+        //            });
+        //        }
+        //    }
+        //}
 
         //static readonly string[] EPC_PREFIXES =
         //{
@@ -630,30 +760,40 @@ namespace RFIDReaderPortal.Services
         //    return result.ToList();
         //}
 
-        public async Task InsertStoredRfidDataAsync()
+        public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {
-            List<RfidData> dataToInsert;
-
-            lock (_storedRfidData)
+            if (_snapshotData == null || _snapshotData.Count == 0)
             {
-                if (_storedRfidData.Count == 0)
-                {
-                    _logger.LogInformation("No stored RFID data to insert");
-                    return;
-                }
-
-                dataToInsert = new List<RfidData>(_storedRfidData);
-                _storedRfidData.Clear();
+                _logger.LogWarning("No snapshot RFID data to insert");
+                return new List<RFIDChestNoMappingDto>();
             }
 
-            _logger.LogInformation($"Inserting {dataToInsert.Count} RFID records");
+            var dataToInsert = _snapshotData
+                .Where(d => d.LapTimes.Count > 0)
+                .ToList();
 
-            await _apiService.PostRFIDRunningLogAsync(
-                _accessToken, _userid, _recruitid, _deviceId,
-                _location, _eventName, _eventId, dataToInsert,
-                _sessionid, _ipaddress
+            if (dataToInsert.Count == 0)
+            {
+                _logger.LogWarning("Snapshot exists but no valid lap data");
+                return new List<RFIDChestNoMappingDto>();
+            }
+
+            var result = await _apiService.PostRFIDRunningLogAsync(
+                _accessToken,
+                _userid,
+                _recruitid,
+                _deviceId,
+                _location,
+                _eventName,
+                _eventId,
+                dataToInsert,
+                _sessionid,
+                _ipaddress
             );
+
+            return result ?? new List<RFIDChestNoMappingDto>();
         }
+
 
         public void ClearData()
         {
@@ -671,6 +811,7 @@ namespace RFIDReaderPortal.Services
         {
             if (!IsRunning && _snapshotData != null)
                 return _snapshotData.OrderBy(d => d.TagId).ToArray();
+
 
             return _receivedDataDict.Values
                 .Where(d => d.Timestamp > _lastClearTime)
