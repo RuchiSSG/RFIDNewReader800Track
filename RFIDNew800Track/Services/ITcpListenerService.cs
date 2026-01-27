@@ -7,6 +7,8 @@ namespace RFIDReaderPortal.Services
     {
         Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync();
         bool IsRunning { get; }
+        void StartRace();   // ✅ ADD THIS
+        void StopRace();
 
         void Start();
 

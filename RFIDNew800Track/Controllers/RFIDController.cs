@@ -179,6 +179,12 @@ namespace RFIDReaderPortal.Controllers
             }
         }
 
+        [HttpPost]
+        public IActionResult StartRace()
+        {
+            _tcpListenerService.StartRace();
+            return Json(new { success = true });
+        }
 
 
         [HttpPost]
