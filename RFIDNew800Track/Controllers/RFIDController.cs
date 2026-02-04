@@ -150,7 +150,18 @@ namespace RFIDReaderPortal.Controllers
                     if (!string.IsNullOrEmpty(item.EventId))
                         Response.Cookies.Append("EventId", item.EventId);
                 }
+                string eventId = Request.Cookies["EventId"];
+                string eventName = Request.Cookies["EventName"];
 
+                var groupResponse = await apiservice.GetAllGroup(
+                    accessToken,
+                    userid,
+                    recruitid,
+                    eventId,
+                    eventName,
+                    sesionid,
+                    ipaddress
+                );
 
                 if (ipDataResponse.Count == 0)
                 {
@@ -167,7 +178,8 @@ namespace RFIDReaderPortal.Controllers
                 {
                     var viewModel1 = new RFIDViewModel
                     {
-                        IPDataResponse = ipDataResponse
+                        IPDataResponse = ipDataResponse,
+                        Groups = groupResponse
                     };
                     return View("Reader", viewModel1);
                 }
@@ -418,6 +430,42 @@ namespace RFIDReaderPortal.Controllers
             {
                 // _logger.LogError(ex, "Error occurred in Reader action");
                 return View("Error", new ErrorViewModel { RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetChestRFIDByGroup(int groupId)
+        {
+            try
+            {
+                string accessToken = Request.Cookies["accesstoken"];
+                string userid = Request.Cookies["UserId"];
+                string recruitid = Request.Cookies["recruitid"];
+                string eventId = Request.Cookies["EventId"];
+                string eventName = Request.Cookies["EventName"];
+                string ipaddress = Request.Cookies["IpAddress"];
+                string sessionid = Request.Cookies["sessionid"];
+
+                var result = await _apiService.GetAllChestRFID(
+                    accessToken,
+                    userid,
+                    recruitid,
+                    eventId,
+                    eventName,
+                    sessionid,
+                    ipaddress,
+                    groupId
+                );
+                // 🔥 YAHI CALL KARO
+                _tcpListenerService.SetAllowedTags(
+                    result.Select(x => x.TagId)
+                );
+
+                return Json(result);
+            }
+            catch
+            {
+                return StatusCode(500, "Failed to fetch chest RFID data");
             }
         }
 

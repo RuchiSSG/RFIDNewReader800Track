@@ -35,6 +35,7 @@ namespace RFIDReaderPortal.Services
         // Reduced window for better tag detection
         //private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromSeconds(2);
         private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromMilliseconds(300);
+        private readonly ConcurrentDictionary<string, bool> _allowedTags = new();
         private readonly ConcurrentQueue<(string epc, DateTime time)> _epcQueue = new();
         private readonly ConcurrentDictionary<string, DateTime> _lastSeenScan
    = new();
@@ -568,9 +569,16 @@ namespace RFIDReaderPortal.Services
         //        }
         //    }
         //}
+ 
 
         private void ProcessTag(string epc, DateTime timestamp)
         {
+            // ❌ IGNORE tag if not mapped to chest/group
+            if (!_allowedTags.ContainsKey(epc))
+            {
+                _logger.LogDebug($"Ignored unknown tag: {epc}");
+                return;
+            }
             var rfidData = _receivedDataDict.GetOrAdd(epc, _ => new RfidData
             {
                 TagId = epc,
@@ -682,6 +690,17 @@ namespace RFIDReaderPortal.Services
 
         //    return result.ToList();
         //}
+        public void SetAllowedTags(IEnumerable<string> tagIds)
+        {
+            _allowedTags.Clear();
+
+            foreach (var tag in tagIds)
+            {
+                _allowedTags[tag.ToUpperInvariant()] = true;
+            }
+
+            _logger.LogInformation($"Allowed RFID Tags loaded: {_allowedTags.Count}");
+        }
 
         public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {

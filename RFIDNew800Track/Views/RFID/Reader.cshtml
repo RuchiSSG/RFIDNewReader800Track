@@ -57,6 +57,19 @@
                             <input type="text" id="location" class="form-control" value="@item.Location" readonly>
                         </div>
                     </div>
+                    <div class="row mb-3 align-items-center">
+                        <label class="col-sm-3 col-form-label">Group:</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="groupId" name="groupId">
+                                <option value="">-- Select Group --</option>
+                                @foreach (var g in Model.Groups)
+                                {
+                                    <option value="@g.groupid">@g.groupname</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
                 }
             </form>
         </div>
@@ -172,6 +185,21 @@
             }
     </table>
 </div>
+<table class="table table-bordered" id="chestTable">
+    <thead>
+        <tr>
+            <th>Chest No</th>
+            <th>RFID Tag</th>
+            <th>Barcode</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td colspan="3">Select Group to load data</td>
+        </tr>
+    </tbody>
+</table>
+
 
 <div class="container mt-5">
     <h1 class="mt-4 text-success">Data</h1>
@@ -233,6 +261,38 @@
 
 @section Scripts {
     <script>
+                                 function loadChestRFID(groupId) {
+            $.get('/RFID/GetChestRFIDByGroup', { groupId: groupId })
+                .done(function (data) {
+
+                    console.log("Chest RFID Data:", data);
+
+                    let tbody = $('#chestTable tbody');
+                    tbody.empty();
+
+                    if (!data || data.length === 0) {
+                        tbody.append('<tr><td colspan="3">No Data</td></tr>');
+                        return;
+                    }
+
+                    data.forEach(item => {
+                        tbody.append(`
+                            <tr>
+                                <td>${item.chestNo}</td>
+                                <td>${item.tagId}</td>
+                                <td>${item.barcode}</td>
+                            </tr>
+                        `);
+                    });
+                })
+                .fail(function () {
+                    alert('Failed to load Chest RFID data');
+                });
+        }
+
+
+
+
                 // Configure toastr
                 toastr.options = {
                     "closeButton": true,
@@ -244,16 +304,23 @@
                 // Success message after login
                 @if (TempData["SuccessMessage"] != null)
                 {
-                            <text>
-                                toastr.success('@TempData["SuccessMessage"]');
-                            </text>
+                                <text>
+                                    toastr.success('@TempData["SuccessMessage"]');
+                                </text>
                 }
 
                     $(document).ready(function () {
                         let updateInterval;
                         let isRunning = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.IsRunning));
 
+                              // 🔥 GROUP CHANGE EVENT (YAHI ADD KARNA HAI)
+        $('#groupId').on('change', function () {
+            var groupId = $(this).val();
 
+            if (groupId) {
+                loadChestRFID(groupId);
+            }
+        });
                         $('#clearButton').click(function () {
                             $.ajax({
                                 url: '@Url.Action("ClearData", "RFID")',

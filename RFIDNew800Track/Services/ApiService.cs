@@ -52,7 +52,7 @@ namespace RFIDReaderPortal.Services
 
             throw new Exception("Failed to fetch recruitment events.");
         }
-            
+
         public async Task<object> GetAllCategorysync(string accessToken, string userid, string recruitid)
         {
             var url = $"{_baseUrl}CategoryMaster/GetAll?userid={userid}&recConfId={recruitid}";
@@ -155,7 +155,7 @@ namespace RFIDReaderPortal.Services
 
                 var response = await _httpClient.SendAsync(request);
 
-               
+
                 if (!response.IsSuccessStatusCode)
                     return new List<RFIDChestNoMappingDto>();
 
@@ -203,7 +203,76 @@ namespace RFIDReaderPortal.Services
                 return new List<RFIDChestNoMappingDto>();
             }
         }
+        public async Task<List<GroupDto>> GetAllGroup(
+string accessToken,
+string userid,
+string recruitid,
+string eventId,
+string eventName,
+string sessionid,
+string ipaddress)
+        {
+            try
+            {
+                var url = $"{_baseUrl}RFIDChestNoMapping/Getgroup?userid={userid}&recruitid={recruitid}&eventId={eventId}&eventName={eventName}&sessionid={sessionid}&ipaddress={ipaddress}";
 
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization =
+                    new AuthenticationHeaderValue("Bearer", accessToken);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return new List<GroupDto>();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<GroupDto>>>(json);
+
+                return apiResponse?.data ?? new List<GroupDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while fetching chest barcode data");
+                return new List<GroupDto>();
+            }
+        }
+
+        public async Task<List<ChestRFIDDto>> GetAllChestRFID(
+string accessToken,
+string userid,
+string recruitid,
+string eventId,
+string eventName,
+string sessionid,
+string ipaddress, int groupId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}RFIDChestNoMapping/GetChestRFID?userid={userid}&recruitid={recruitid}&eventId={eventId}&eventName={eventName}&sessionid={sessionid}&ipaddress={ipaddress}&groupid={groupId}";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization =
+                    new AuthenticationHeaderValue("Bearer", accessToken);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return new List<ChestRFIDDto>();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<ChestRFIDDto>>>(json);
+
+                return apiResponse?.data ?? new List<ChestRFIDDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while fetching chest barcode data");
+                return new List<ChestRFIDDto>();
+            }
+        }
+   
         //public async Task<bool> PostRFIDRunningLogAsync(string accessToken, string userid, string recruitid, string DeviceId, string Location, string eventName, List<RfidData> rfidDataList, string sessionid, string ipaddress)
         //{
         //    try
