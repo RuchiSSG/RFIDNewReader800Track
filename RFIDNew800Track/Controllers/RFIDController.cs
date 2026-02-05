@@ -458,8 +458,8 @@ namespace RFIDReaderPortal.Controllers
                 );
                 // 🔥 YAHI CALL KARO
                 _tcpListenerService.SetAllowedTags(
-                    result.Select(x => x.TagId)
-                );
+         result.Select(x => x.TagId)
+     );
 
                 return Json(result);
             }

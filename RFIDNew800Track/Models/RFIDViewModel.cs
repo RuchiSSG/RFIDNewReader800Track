@@ -17,7 +17,7 @@ namespace RFIDReaderPortal.Models
         public string? StatusMessage { get; set; }
 
         // public List<RFIDChestNoMappingDto> Groups { get; set; }
-        public List<GroupDto> Groups { get; set; }
+        public List<GroupDto>? Groups { get; set; }
         public string? UserId { get; set; }
 
         // public string EventName { get; set; }

@@ -41,8 +41,8 @@ namespace RFIDReaderPortal.Services
    = new();
         public bool IsRunning { get; private set; }
 
-        private const int MAX_DATA_COUNT = 1000;
-        private const int BUFFER_SIZE = 16384; // Increased to 16KB
+        private const int MAX_DATA_COUNT = 3000;
+        private const int BUFFER_SIZE = 65536; // Increased to 16KB
         private readonly List<RfidData> _storedRfidData = new List<RfidData>();
         private List<RfidData> _snapshotData = new List<RfidData>();
         TimeSpan minGap;
@@ -178,8 +178,6 @@ namespace RFIDReaderPortal.Services
 
                 try
                 {
-                    // stream.ReadTimeout = 5000; // 5 second timeout
-
                     while (client.Connected && IsRunning)
                     {
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
@@ -190,42 +188,29 @@ namespace RFIDReaderPortal.Services
                             break;
                         }
 
-                        // Convert to HEX immediately
+                        // Convert bytes to hex
                         string hexData = BytesToHex(buffer, bytesRead);
 
                         _logger.LogDebug($"Received {bytesRead} bytes: {hexData.Substring(0, Math.Min(100, hexData.Length))}...");
 
-                        // Store hex data for debugging
+                        // Store hex for debugging
                         lock (_hexLock)
                         {
                             if (_hexdataCount < MAX_DATA_COUNT)
-                            {
                                 _hexString[_hexdataCount++] = hexData;
-                            }
                         }
-                        //ProcessHexBuffer(hexData);
+
+                        // ---------------- MULTI-ANTENNA SAFE ----------------
                         lock (_hexBuffer)
                         {
                             _hexBuffer.Append(hexData);
 
                             // Keep buffer reasonable
-                            if (_hexBuffer.Length > 5000)
-                                _hexBuffer.Remove(0, _hexBuffer.Length - 5000);
+                            if (_hexBuffer.Length > 65536) // 64 KB max
+                                _hexBuffer.Remove(0, _hexBuffer.Length - 65536);
 
                             ProcessHexBuffer(_hexBuffer);
                         }
-
-                        // Append to buffer in case of fragmented messages
-                        // clientBuffer.Append(hexData);
-
-                        // Process accumulated buffer
-                        //ProcessHexBuffer(clientBuffer.ToString());
-
-                        // Keep only last 1000 characters to prevent memory issues
-                        //if (clientBuffer.Length > 1000)
-                        //{
-                        //    clientBuffer.Clear();
-                        //}
                     }
                 }
                 catch (IOException ioEx)
@@ -304,7 +289,7 @@ namespace RFIDReaderPortal.Services
         }
         private void StartEpcProcessor()
         {
-            int workers = Environment.ProcessorCount >= 4 ? 4 : 2;
+            int workers = Environment.ProcessorCount >= 4 ? 4 : Environment.ProcessorCount;
 
             for (int i = 0; i < workers; i++)
             {
@@ -318,7 +303,7 @@ namespace RFIDReaderPortal.Services
                         }
                         else
                         {
-                            await Task.Delay(1);
+                            await Task.Delay(1); // minimal CPU usage while idle
                         }
                     }
                 });
@@ -569,7 +554,7 @@ namespace RFIDReaderPortal.Services
         //        }
         //    }
         //}
- 
+
 
         private void ProcessTag(string epc, DateTime timestamp)
         {
@@ -650,23 +635,23 @@ namespace RFIDReaderPortal.Services
             }
         }
 
-        private static List<string> ExtractEpcs(string hex)
-        {
-            if (string.IsNullOrWhiteSpace(hex))
-                return new List<string>();
+        //private static List<string> ExtractEpcs(string hex)
+        //{
+        //    if (string.IsNullOrWhiteSpace(hex))
+        //        return new List<string>();
 
-            // ONLY: E280117000000212AC + 6 hex chars
-            var matches = Regex.Matches(
-                hex,
-                @"E280117000000212AC[0-9A-F]{6}",
-                RegexOptions.IgnoreCase
-            );
+        //    // ONLY: E280117000000212AC + 6 hex chars
+        //    var matches = Regex.Matches(
+        //        hex,
+        //        @"E280117000000212AC[0-9A-F]{6}",
+        //        RegexOptions.IgnoreCase
+        //    );
 
-            return matches
-                .Select(m => m.Value.ToUpperInvariant())
-                .Distinct()
-                .ToList();
-        }
+        //    return matches
+        //        .Select(m => m.Value.ToUpperInvariant())
+        //        .Distinct()
+        //        .ToList();
+        //}
         //private static List<string> ExtractEpcs(string hex)
         //{
         //    const int EPC_LEN = 24;
@@ -692,15 +677,21 @@ namespace RFIDReaderPortal.Services
         //}
         public void SetAllowedTags(IEnumerable<string> tagIds)
         {
-            _allowedTags.Clear();
-
-            foreach (var tag in tagIds)
+            if (_raceStarted)
             {
-                _allowedTags[tag.ToUpperInvariant()] = true;
+                _logger.LogWarning("Group change ignored. Race already started.");
+                return;
             }
 
-            _logger.LogInformation($"Allowed RFID Tags loaded: {_allowedTags.Count}");
+            _allowedTags.Clear();
+            foreach (var tag in tagIds)
+                _allowedTags[tag.ToUpperInvariant()] = true;
+
+            _receivedDataDict.Clear();
+            _lastProcessed.Clear();
         }
+
+
 
         public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {
