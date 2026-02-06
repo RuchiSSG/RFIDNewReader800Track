@@ -16,6 +16,7 @@ namespace RFIDReaderPortal.Services
 
         Task<object> GetAsync(string accessToken, string userid, string deviceid, string sessionid, string ipaddress);
         Task ProcessRFIDEventAsync(EventModel model, string accessToken);
+        Task<List<GroupDto>> GetAllGroup(string accessToken, string userid, string recruitid, string eventId, string eventName, string sessionid, string ipaddress);
         Task<List<ChestRFIDDto>> GetAllChestRFID(string accessToken,string userid,string recruitid,string eventId,string eventName,string sessionid,string ipaddress, int groupId);
         Task<dynamic> InsertDeviceConfigurationAsync(string accessToken, DeviceConfigurationDto formData, string sesionid, string ipaddress);
         Task<DeleteRfid> DeleteRFIDRecordsAsync(string accessToken, string userid, string recruitid, string deviceId, string location, string eventName,string eventId, string sessionid, string ipaddress);

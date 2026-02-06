@@ -69,10 +69,17 @@
                             <div class="col-sm-9">
                                 <select class="form-select" id="groupId" name="groupId">
                                     <option value="">-- Select Group --</option>
-                                    @foreach (var g in Model.Groups)
+                                @if (Model.Groups != null && Model.Groups.Any())
+                                {
+                                    foreach (var g in Model.Groups)
                                     {
                                         <option value="@g.groupid">@g.groupname</option>
                                     }
+                                }
+                                else
+                                {
+                                    <option value="">No Groups Available</option>
+                                }
                                 </select>
                             </div>
                         </div>            

@@ -150,18 +150,6 @@ namespace RFIDReaderPortal.Controllers
                     if (!string.IsNullOrEmpty(item.EventId))
                         Response.Cookies.Append("EventId", item.EventId);
                 }
-                string eventId = Request.Cookies["EventId"];
-                string eventName = Request.Cookies["EventName"];
-
-                var groupResponse = await apiservice.GetAllGroup(
-                    accessToken,
-                    userid,
-                    recruitid,
-                    eventId,
-                    eventName,
-                    sesionid,
-                    ipaddress
-                );
 
                 if (ipDataResponse.Count == 0)
                 {
@@ -176,13 +164,10 @@ namespace RFIDReaderPortal.Controllers
                 }
                 else
                 {
-                    var viewModel1 = new RFIDViewModel
-                    {
-                        IPDataResponse = ipDataResponse,
-                        Groups = groupResponse
-                    };
-                    return View("Reader", viewModel1);
+                    return RedirectToAction("Reader");
                 }
+            
+                
             }
             catch (Exception ex)
             {
@@ -415,13 +400,23 @@ namespace RFIDReaderPortal.Controllers
                 new RecruitmentEventDto { eventName = ipDataResponse[0].EventId }
             };
                 }
+                var groupResponse = await _apiService.GetAllGroup(
+                 accessToken,
+                 userid,
+                 recruitid,
+                 eventId,
+                 eventName,
+                 sesionid,
+                 ipaddress
+             );
 
                 var viewModel = new RFIDViewModel
                 {
                     RfidDataArray = rfidDataArray,
                     IsRunning = _tcpListenerService.IsRunning,
                     IPDataResponse = ipDataResponse,
-                    eventname = eventsList // Now correctly typed as IEnumerable<RecruitmentEventDto>
+                    eventname = eventsList, // Now correctly typed as IEnumerable<RecruitmentEventDto>
+                    Groups = groupResponse ?? new List<GroupDto>()
                 };
 
                 return View(viewModel);
