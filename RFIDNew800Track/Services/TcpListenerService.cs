@@ -27,7 +27,7 @@ namespace RFIDReaderPortal.Services
         private string _eventId;
         private string _sessionid;
         private string _ipaddress;
-
+        private DateTime? _raceStartTime;
         private DateTime _lastClearTime = DateTime.MinValue;
         private readonly IApiService _apiService;
         private readonly ILogger<TcpListenerService> _logger;
@@ -123,7 +123,7 @@ namespace RFIDReaderPortal.Services
         public void StartRace()
         {
             _raceStarted = true;
-
+            _raceStartTime = DateTime.Now;
             // 🔥 CLEAR EVERYTHING BEFORE START
             _receivedDataDict.Clear();
             _lastProcessed.Clear();
@@ -548,6 +548,92 @@ namespace RFIDReaderPortal.Services
         //            {
         //                TagId = rfidData.TagId,
         //                Timestamp = rfidData.Timestamp,
+        //                LapTimes = new List<DateTime>(rfidData.LapTimes),
+        //                IsCompleted = rfidData.IsCompleted
+        //            });
+        //        }
+        //    }
+        //}
+
+
+
+        //start time ajust if start time not read
+        //private void ProcessTag(string epc, DateTime timestamp)
+        //{
+        //    if (!_allowedTags.ContainsKey(epc))
+        //        return;
+
+        //    var rfidData = _receivedDataDict.GetOrAdd(epc, _ => new RfidData
+        //    {
+        //        TagId = epc,
+        //        Timestamp = DateTime.MinValue,
+        //        LapTimes = new List<DateTime>(),
+        //        IsCompleted = false
+        //    });
+
+        //    if (rfidData.IsCompleted)
+        //        return;
+
+        //    // 🟡 START MISS CASE
+        //    if (rfidData.LapTimes.Count == 0 && _raceStartTime.HasValue)
+        //    {
+        //        // Inject START TIME
+        //        rfidData.LapTimes.Add(_raceStartTime.Value);
+
+        //        _logger.LogWarning(
+        //            $"START MISS detected. Adjusted start for {epc} to {_raceStartTime:HH:mm:ss.fff}"
+        //        );
+        //    }
+
+        //    // 🟡 Duplicate prevention
+        //    if (rfidData.LapTimes.Count > 1)
+        //    {
+        //        var gap = timestamp - rfidData.Timestamp;
+        //        if (gap < _duplicatePreventionWindow)
+        //            return;
+        //    }
+
+        //    rfidData.Timestamp = timestamp;
+
+        //    bool shouldStore = false;
+
+        //    // 🟢 Single lap events
+        //    if (_eventName == "100 Meter Running" ||
+        //        _eventName == "500 meter Running" ||
+        //        _eventName == "800 Meter Running")
+        //    {
+        //        if (rfidData.LapTimes.Count == 1) // start already injected
+        //        {
+        //            rfidData.LapTimes.Add(timestamp); // finish
+        //            rfidData.IsCompleted = true;
+        //            shouldStore = true;
+        //        }
+        //    }
+        //    // 🟢 1600m
+        //    else if (_eventName == "1600 Meter Running")
+        //    {
+        //        int maxLaps = 2;
+        //        TimeSpan minGap = TimeSpan.FromSeconds(15);
+
+        //        var lastLap = rfidData.LapTimes.Last();
+        //        if (timestamp - lastLap < minGap)
+        //            return;
+
+        //        rfidData.LapTimes.Add(timestamp);
+        //        shouldStore = true;
+
+        //        if (rfidData.LapTimes.Count >= maxLaps + 1) // start + 2 laps
+        //            rfidData.IsCompleted = true;
+        //    }
+
+        //    if (shouldStore)
+        //    {
+        //        lock (_storedRfidData)
+        //        {
+        //            _storedRfidData.Add(new RfidData
+        //            {
+        //                TagId = rfidData.TagId,
+        //                Timestamp = timestamp,
         //                LapTimes = new List<DateTime>(rfidData.LapTimes),
         //                IsCompleted = rfidData.IsCompleted
         //            });
