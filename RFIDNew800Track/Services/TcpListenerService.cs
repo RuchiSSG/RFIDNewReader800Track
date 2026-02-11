@@ -579,8 +579,8 @@ namespace RFIDReaderPortal.Services
                 IsCompleted = false
             });
 
-            if (rfidData.IsCompleted)
-                return;
+            //if (rfidData.IsCompleted)
+            //    return;
 
             // ✅ Duplicate prevention AFTER first valid lap
             if (rfidData.LapTimes.Count > 0)
@@ -600,10 +600,19 @@ namespace RFIDReaderPortal.Services
             {
                 if (rfidData.LapTimes.Count == 0)
                 {
+                    // First scan (Start)
                     rfidData.LapTimes.Add(timestamp);
-                    rfidData.IsCompleted = true;
+                    rfidData.Timestamp = timestamp;
                     shouldStore = true;
                 }
+                else
+                {
+                    // Keep updating with latest scan (Finish keeps updating)
+                    rfidData.Timestamp = timestamp;
+                    rfidData.LapTimes[0] = timestamp;  // 🔥 overwrite with latest time
+                    shouldStore = true;
+                }
+
                 return;
             }
 
