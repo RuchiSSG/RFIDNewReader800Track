@@ -13,7 +13,7 @@ namespace RFIDReaderPortal.Services
             //          return (
             //    new List<string>
             //    {
-            //          "192.168.0.225"   // 👉 yaha apna RFID reader IP dalo
+            //                    "192.168.0.225"   // 👉 yaha apna RFID reader IP dalo
             //    },
             //    "Manual IP set for testing"
             //);
