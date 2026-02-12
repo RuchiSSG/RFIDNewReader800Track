@@ -81,8 +81,10 @@ namespace RFIDReaderPortal.Services
         {
             if (!IsRunning)
             {
-                _tcpListener.Start();
+               
+                _logger.LogInformation("LISTENER INSTANCE ID: " + this.GetHashCode());
                 IsRunning = true;
+                _tcpListener.Start();
                 StartEpcProcessor();
                 _logger.LogInformation("TCP Listener started on port 9090");
                 Task.Run(async () => await ListenAsync());
@@ -109,8 +111,8 @@ namespace RFIDReaderPortal.Services
                 .OrderBy(d => d.TagId)
                 .ToList();
 
-            _logger.LogInformation(
-                $"TCP Listener stopped. Snapshot count = {_snapshotData.Count}");
+           // _logger.LogInformation(
+              //  $"TCP Listener stopped. Snapshot count = {_snapshotData.Count}");
         }
 
         //public void Stop()
@@ -139,7 +141,7 @@ namespace RFIDReaderPortal.Services
 
             _lastClearTime = DateTime.Now;
 
-            _logger.LogInformation("Race officially STARTED - old data cleared");
+            //_logger.LogInformation("Race officially STARTED - old data cleared");
         }
 
 
@@ -147,18 +149,21 @@ namespace RFIDReaderPortal.Services
         public void StopRace()
         {
             _raceStarted = false;
-            _logger.LogInformation("Race STOPPED");
+          //  _logger.LogInformation("Race STOPPED");
         }
 
         private async Task ListenAsync()
         {
+            Console.WriteLine("🔥 LISTEN LOOP STARTED");
             while (IsRunning)
             {
+                Console.WriteLine("⏳ Waiting for client...");
                 try
                 {
                     var client = await _tcpListener.AcceptTcpClientAsync();
-                    _logger.LogInformation($"Client connected from {client.Client.RemoteEndPoint}");
-                    _ = Task.Run(() => ProcessClientAsync(client));
+                   // _logger.LogInformation($"Client connected from {client.Client.RemoteEndPoint}");
+                    Console.WriteLine("✅ CLIENT ACCEPTED");
+                    await ProcessClientAsync(client);
                 }
                 catch (Exception ex)
                 {
@@ -172,6 +177,8 @@ namespace RFIDReaderPortal.Services
 
         private async Task ProcessClientAsync(TcpClient client)
         {
+            _logger.LogInformation($"MATCHED EPC FROM BUFFER 11:{DateTime.UtcNow.Ticks}");
+           // _logger.LogInformation($"Client connected from {client.Client.RemoteEndPoint}");
             using (client)
             using (var stream = client.GetStream())
             {
@@ -180,19 +187,24 @@ namespace RFIDReaderPortal.Services
 
                 try
                 {
+                    _logger.LogInformation($"MATCHED EPC FROM BUFFER2:{DateTime.UtcNow.Ticks}");
                     while (client.Connected && IsRunning)
                     {
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                        Console.WriteLine("=================================");
+                        Console.WriteLine($"BYTES READ: {bytesRead}");
 
                         if (bytesRead <= 0)
                         {
                             _logger.LogInformation("Client disconnected");
                             break;
                         }
-
+                        _logger.LogInformation($"MATCHED EPC FROM BUFFER3:{DateTime.UtcNow.Ticks}");
                         // Convert bytes to hex
                         string hexData = BytesToHex(buffer, bytesRead);
-
+                        _logger.LogInformation("RAW HEX FROM READER:");
+                         _logger.LogInformation(hexData);
+                         _logger.LogInformation("=================================");
                         _logger.LogDebug($"Received {bytesRead} bytes: {hexData.Substring(0, Math.Min(100, hexData.Length))}...");
 
                         // Store hex for debugging
@@ -210,7 +222,8 @@ namespace RFIDReaderPortal.Services
                             // Keep buffer reasonable
                             if (_hexBuffer.Length > 65536) // 64 KB max
                                 _hexBuffer.Remove(0, _hexBuffer.Length - 65536);
-
+                            _logger.LogInformation("----- CURRENT HEX BUFFER -----");
+                             _logger.LogInformation(_hexBuffer.ToString());
                             ProcessHexBuffer(_hexBuffer);
                         }
                     }
@@ -255,7 +268,12 @@ namespace RFIDReaderPortal.Services
             foreach (Match m in matches)
             {
                 var epc = m.Value.ToUpperInvariant();
+                //_logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc}");
+                long datetime = DateTime.Now.Ticks;
                 _epcQueue.Enqueue((epc, DateTime.Now));
+               // _logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc},{DateTime.UtcNow}");
+               _logger.LogInformation($"MATCHED EPC FROM BUFFER 4444:{epc},{datetime}");
+              _logger.LogInformation($"MATCHED EPC FROM BUFFER: ");
             }
 
             // 🔥 REMOVE processed part completely

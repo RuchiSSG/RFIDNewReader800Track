@@ -368,9 +368,11 @@
                             success: function(response) {
                                 updateTable(response.rfidDataArray);
                             },
-                            complete: function() {
-                                if (isRunning) setTimeout(updateRfidData, 150);
-                            }
+                                    complete: function() {
+            if (isRunning === true) {
+                setTimeout(updateRfidData, 150);
+            }
+        }
                         });
                     }
 
@@ -707,15 +709,23 @@
                                 }
                             }
 
-                                       $('#startButton').click(function () {
-                $.ajax({
-                    url: '@Url.Action("StartRace", "RFID")',
-                    type: 'POST',
-                    success: function () {
-                        toggleListenerState(true);
-                    }
-                });
+                $('#startButton').click(function () {
+
+            $.post('@Url.Action("StartRace", "RFID")', function () {
+
+                isRunning = true;
+
+                $('#debugInfo').text('Race Started... Listening for tags');
+
+                updateRfidData();
+
+                $('#startButton').prop('disabled', true);
+                $('#stopButton').prop('disabled', false);
+                $('#clearButton').prop('disabled', true);
             });
+
+        });
+
 
                                                    $('#stopButton').click(function () {
                         $.ajax({
