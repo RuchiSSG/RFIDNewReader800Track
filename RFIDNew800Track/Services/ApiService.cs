@@ -114,7 +114,7 @@ namespace RFIDReaderPortal.Services
         {
             try
             {
-                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&eventId={eventId}&sessionid={sessionid}&ipaddress={ipaddress}";
+                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog800Meter?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&eventId={eventId}&sessionid={sessionid}&ipaddress={ipaddress}";
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
 
                 // Group by TagId
