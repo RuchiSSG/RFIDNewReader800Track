@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace RFIDReaderPortal.Services
 {
@@ -318,10 +319,15 @@ namespace RFIDReaderPortal.Services
             return new string(c);
         }
 
+
+// 4️⃣ EXTRACT EPC FROM HEX BUFFER
+//-------------------------------------------------------------
+//Method: ProcessHexBuffer()
         private void ProcessHexBuffer(StringBuilder buffer)
         {
             string data = buffer.ToString();
-
+            //- Uses Regex:
+            //  @"E2801170000002[0-9A-F]{10}"
             var matches = Regex.Matches(
                 data,
                 @"E2801170000002[0-9A-F]{10}",
@@ -374,15 +380,21 @@ namespace RFIDReaderPortal.Services
         //    }
         //}
 
+
+//5️⃣ EPC PROCESSING THREAD
+//-------------------------------------------------------------
+//Method: StartEpcProcessor()
         private void StartEpcProcessor()
         {
             Task.Run(async () =>
             {
                 while (IsRunning)
                 {
+                    //- Dequeues EPC from _epcQueue.
                     if (_epcQueue.TryDequeue(out var item))
                     {
                         Console.WriteLine($"RAW EPC FROM READER: {item.epc}");
+                        //- Calls ProcessTag(epc, timestamp).
                         ProcessTag(item.epc, item.time);
                     }
                     else
@@ -486,10 +498,14 @@ namespace RFIDReaderPortal.Services
         //}
 
         //Latest updated time get from this 
+        //6️⃣ TAG PROCESSING LOGIC
+        //-------------------------------------------------------------
+        //Method: ProcessTag()
         private void ProcessTag(string epc, DateTime timestamp)
         {
 
             Console.WriteLine($"TAG READ: {epc} at {timestamp:HH:mm:ss.fff}");
+           // -Check if tag exists in _allowedTags.
             if (!_allowedTags.ContainsKey(epc))
             {
                 _logger.LogDebug($"Ignored unknown tag: {epc}");
@@ -635,7 +651,9 @@ namespace RFIDReaderPortal.Services
         }
 
 
-
+// 8️⃣ SAVE DATA TO API
+//-------------------------------------------------------------
+//Method: InsertStoredRfidDataAsync()
         public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {
             if (_snapshotData == null || _snapshotData.Count == 0)
@@ -670,7 +688,9 @@ namespace RFIDReaderPortal.Services
             return result ?? new List<RFIDChestNoMappingDto>();
         }
 
-
+//        9️⃣ CLEAR DATA
+//-------------------------------------------------------------
+//Method: ClearData()
         public void ClearData()
         {
             _receivedDataDict.Clear();
@@ -685,6 +705,15 @@ namespace RFIDReaderPortal.Services
             _hexBuffer.Clear();
             _logger.LogInformation("All RFID data cleared");
         }
+
+
+
+//        🔟 LIVE DATA FETCH
+//-------------------------------------------------------------
+//Method: GetReceivedData()
+//- If race stopped → return snapshot
+//- If running → return current dictionary
+//- Ordered by TagId
         public RfidData[] GetReceivedData()
         {
             if (!IsRunning && _snapshotData != null)
