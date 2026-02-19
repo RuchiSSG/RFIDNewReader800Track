@@ -505,12 +505,17 @@ namespace RFIDReaderPortal.Services
         {
 
             Console.WriteLine($"TAG READ: {epc} at {timestamp:HH:mm:ss.fff}");
-           // -Check if tag exists in _allowedTags.
-            if (!_allowedTags.ContainsKey(epc))
+            // -Check if tag exists in _allowedTags.
+            if (_allowedTags.IsEmpty)
+            {
+                _logger.LogWarning("AllowedTags not loaded yet. Skipping validation temporarily.");
+            }
+            else if (!_allowedTags.ContainsKey(epc))
             {
                 _logger.LogDebug($"Ignored unknown tag: {epc}");
                 return;
             }
+
 
             var rfidData = _receivedDataDict.GetOrAdd(epc, _ => new RfidData
             {

@@ -816,6 +816,7 @@ namespace RFIDReaderPortal.Controllers
         [HttpPost]
         public IActionResult StartRace()
         {
+            _tcpListenerService.Start();
             _tcpListenerService.ClearData();
             _tcpListenerService.StartRace();
             return Json(new { success = true });
@@ -997,7 +998,7 @@ namespace RFIDReaderPortal.Controllers
                         return RedirectToAction("Configuration");
                     }
 
-                    _tcpListenerService.Start();
+                   // _tcpListenerService.Start();
                 }
 
                 ViewBag.IsRunning = _tcpListenerService.IsRunning;
