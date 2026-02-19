@@ -508,11 +508,11 @@ namespace RFIDReaderPortal.Services
             // -Check if tag exists in _allowedTags.
             if (_allowedTags.IsEmpty)
             {
-                _logger.LogWarning("AllowedTags not loaded yet. Skipping validation temporarily.");
+                _logger.LogInformation("AllowedTags not loaded yet. Skipping validation temporarily.");
             }
             else if (!_allowedTags.ContainsKey(epc))
             {
-                _logger.LogDebug($"Ignored unknown tag: {epc}");
+                _logger.LogInformation($"Ignored unknown tag: {epc}");
                 return;
             }
 
