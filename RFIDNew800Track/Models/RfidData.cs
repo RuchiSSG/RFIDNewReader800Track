@@ -3,6 +3,7 @@
     public class RfidData
     {
         public string TagId { get; set; }
+        public DateTime LastScanTime { get; set; }
         public DateTime Timestamp { get; set; }
         public List<DateTime> LapTimes { get; set; }
         public byte Rssi { get; set; }

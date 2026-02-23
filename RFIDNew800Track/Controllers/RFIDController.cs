@@ -953,6 +953,7 @@ namespace RFIDReaderPortal.Controllers
         [HttpPost]
         public async Task<IActionResult> Stop()
         {
+            _tcpListenerService.StopRace();
             _tcpListenerService.Stop();
 
             var data = await _tcpListenerService.InsertStoredRfidDataAsync();
@@ -1164,12 +1165,27 @@ namespace RFIDReaderPortal.Controllers
             _tcpListenerService.SetParameters(accessToken, userid, recruitid, deviceId, location, eventName, eventId, ipaddress, sesionid);
             var rfidDataArray = _tcpListenerService.GetReceivedData();
             var hexStringArray = _tcpListenerService.GetHexData();
-       
             return Json(new
             {
                 rfidDataArray = rfidDataArray.Select(item =>
                 {
-                    var lastLapTime = item.LapTimes.LastOrDefault();
+                    string duration = null;
+
+                    if (item.LapTimes.Count == 1)
+                    {
+                        // Live running from Lap1
+                        var diff = DateTime.Now - item.LapTimes[0];
+                        duration = diff.ToString(@"hh\:mm\:ss\:fff");
+                    }
+                    else if (item.LapTimes.Count == 2)
+                    {
+                        var endTime = item.IsCompleted
+                            ? item.LapTimes[1]          // Freeze
+                            : DateTime.Now;             // Live update
+
+                        var diff = endTime - item.LapTimes[0];
+                        duration = diff.ToString(@"hh\:mm\:ss\:fff");
+                    }
 
                     return new
                     {
@@ -1178,15 +1194,34 @@ namespace RFIDReaderPortal.Controllers
                             .Select(t => t.ToString("HH:mm:ss:fff"))
                             .ToList(),
                         lapCount = item.LapTimes.Count,
-                        lastLap = lastLapTime == default(DateTime)
-                            ? null
-                            : lastLapTime.ToString("HH:mm:ss:fff")
+                        duration = duration,
+                        isCompleted = item.IsCompleted
                     };
                 }).ToList(),
-                count = rfidDataArray.Length,
-                isRunning = _tcpListenerService.IsRunning,
-                hexString = hexStringArray
             });
+
+            //return Json(new
+            //{
+            //    rfidDataArray = rfidDataArray.Select(item =>
+            //    {
+            //        var lastLapTime = item.LapTimes.LastOrDefault();
+
+            //        return new
+            //        {
+            //            tagId = item.TagId,
+            //            lapTimes = item.LapTimes
+            //                .Select(t => t.ToString("HH:mm:ss:fff"))
+            //                .ToList(),
+            //            lapCount = item.LapTimes.Count,
+            //            lastLap = lastLapTime == default(DateTime)
+            //                ? null
+            //                : lastLapTime.ToString("HH:mm:ss:fff")
+            //        };
+            //    }).ToList(),
+            //    count = rfidDataArray.Length,
+            //    isRunning = _tcpListenerService.IsRunning,
+            //    hexString = hexStringArray
+            //});
         }
 
         //[HttpGet]

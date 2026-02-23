@@ -51,7 +51,7 @@ namespace RFIDReaderPortal.Services
         TimeSpan minGap;
         // Buffer to accumulate incomplete hex data
         private StringBuilder _hexBuffer = new StringBuilder();
-
+        private Timer _completionTimer;
         public TcpListenerService(IApiService apiService, ILogger<TcpListenerService> logger, int port = 9090)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
@@ -60,6 +60,7 @@ namespace RFIDReaderPortal.Services
             _receivedDataDict = new ConcurrentDictionary<string, RfidData>();
             _hexString = new string[MAX_DATA_COUNT];
             _hexdataCount = 0;
+            _completionTimer = new Timer(CheckCompletion, null, 0, 1000);
         }
 
         public void SetParameters(string accessToken, string userid, string recruitid,
@@ -93,7 +94,7 @@ namespace RFIDReaderPortal.Services
         {
             if (!IsRunning)
                 return;
-
+            _raceStarted = false;
             IsRunning = false;
             _tcpListener.Stop();
 
@@ -583,6 +584,7 @@ namespace RFIDReaderPortal.Services
                     if (gapFromLap1 >= minLapGap)
                     {
                         rfidData.LapTimes.Add(timestamp);
+                        rfidData.LastScanTime = timestamp;
                         shouldStore = true;
                     }
                     else
@@ -598,16 +600,32 @@ namespace RFIDReaderPortal.Services
                 // 🔹 Only update Lap 2 (never add Lap 3)
                 if (rfidData.LapTimes.Count == 2)
                 {
-                    var previousLap2 = rfidData.LapTimes[1];
+                    // 🚫 Stop updating if already completed
+                    if (rfidData.IsCompleted)
+                        return;
 
+                    // 🔥 Always update Lap 2 time
                     rfidData.LapTimes[1] = timestamp;
-                    shouldStore = true;
 
-                    if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
-                    {
-                        rfidData.IsCompleted = true;
-                    }
+                    // 🔥 Update last scan time
+                    rfidData.LastScanTime = timestamp;
+
+                    shouldStore = true;
+                    return;
                 }
+
+                //if (rfidData.LapTimes.Count == 2)
+                //{
+                //    var previousLap2 = rfidData.LapTimes[1];
+
+                //    rfidData.LapTimes[1] = timestamp;
+                //    shouldStore = true;
+
+                //    if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
+                //    {
+                //        rfidData.IsCompleted = true;
+                //    }
+                //}
 
             }
 
@@ -639,6 +657,25 @@ namespace RFIDReaderPortal.Services
 
         }
 
+        private void CheckCompletion(object state)
+        {
+            foreach (var item in _receivedDataDict.Values)
+            {
+                if (item.LapTimes.Count == 2 && !item.IsCompleted)
+                {
+                    var idle = DateTime.Now - item.LastScanTime;
+
+                    if (idle >= TimeSpan.FromSeconds(5))
+                    {
+                        item.IsCompleted = true;
+                    }
+                }
+            }
+        }
+
+
+
+
         public void SetAllowedTags(IEnumerable<string> tagIds)
         {
             if (_raceStarted)
@@ -647,18 +684,35 @@ namespace RFIDReaderPortal.Services
                 return;
             }
 
-            _allowedTags.Clear();
-            foreach (var tag in tagIds)
-                _allowedTags[tag.ToUpperInvariant()] = true;
+            if (tagIds == null)
+            {
+                _logger.LogWarning("SetAllowedTags called with null list.");
+                return;
+            }
 
-            _receivedDataDict.Clear();
-            _lastProcessed.Clear();
+            lock (_lock)   // 🔒 Thread safety
+            {
+                _allowedTags.Clear();
+
+                foreach (var tag in tagIds)
+                {
+                    if (string.IsNullOrWhiteSpace(tag))
+                        continue;
+
+                    _allowedTags[tag.Trim().ToUpperInvariant()] = true;
+                }
+
+                _receivedDataDict.Clear();
+                _lastProcessed.Clear();
+            }
+
+            _logger.LogInformation($"Allowed tags updated: {_allowedTags.Count}");
         }
 
 
-// 8️⃣ SAVE DATA TO API
-//-------------------------------------------------------------
-//Method: InsertStoredRfidDataAsync()
+        // 8️⃣ SAVE DATA TO API
+        //-------------------------------------------------------------
+        //Method: InsertStoredRfidDataAsync()
         public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {
             if (_snapshotData == null || _snapshotData.Count == 0)

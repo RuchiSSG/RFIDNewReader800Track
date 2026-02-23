@@ -161,6 +161,7 @@ builder.Services.AddSingleton<IApiService>(sp =>
 
 builder.Services.AddScoped<IRFIDDiscoveryService, RFIDDiscoveryService>();
 builder.Services.AddSingleton<ITcpListenerService, TcpListenerService>();
+//builder.Services.AddScoped<ITcpListenerService, TcpListenerService>();
 
 // Add ApiBaseUrl to DI container
 builder.Services.AddSingleton(new ApiConfig { BaseUrl = apiBaseUrl });
