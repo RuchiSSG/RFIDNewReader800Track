@@ -33,7 +33,7 @@ namespace RFIDReaderPortal.Services
         private DateTime _lastClearTime = DateTime.MinValue;
         private readonly IApiService _apiService;
         private readonly ILogger<TcpListenerService> _logger;
-
+        private Timer _completionTimer;
         // Reduced window for better tag detection
         //private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromSeconds(2);
         private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromMilliseconds(300);
@@ -60,6 +60,7 @@ namespace RFIDReaderPortal.Services
             _receivedDataDict = new ConcurrentDictionary<string, RfidData>();
             _hexString = new string[MAX_DATA_COUNT];
             _hexdataCount = 0;
+            _completionTimer = new Timer(CheckCompletion, null, 1000, 1000);
         }
 
         public void SetParameters(string accessToken, string userid, string recruitid,
@@ -156,7 +157,38 @@ namespace RFIDReaderPortal.Services
         }
 
 
+        private void CheckCompletion(object state)
+        {
+            if (_eventName != "1600 Meter Running")
+                return;
 
+            foreach (var item in _receivedDataDict.Values)
+            {
+                if (item.IsCompleted)
+                    continue;
+
+                // Only after 2 laps
+                if (item.LapTimes.Count < 2)
+                    continue;
+
+                if (item.LastScanTime == default)
+                    continue;
+
+                var idleTime = DateTime.UtcNow - item.LastScanTime;
+
+                // 🔥 5 sec no scan → complete
+                if (idleTime.TotalSeconds >= 5)
+                {
+                    item.IsCompleted = true;
+
+                    _logger.LogInformation(
+                        $"1600m Auto-completed for {item.TagId} after 5 sec idle");
+
+                    Console.WriteLine(
+                        $"1600m STOPPED updating {item.TagId} at {DateTime.Now:HH:mm:ss}");
+                }
+            }
+        }
 
         public void StopRace()
         {
@@ -534,6 +566,7 @@ namespace RFIDReaderPortal.Services
             }
 
             rfidData.Timestamp = timestamp;
+            rfidData.LastScanTime = DateTime.UtcNow;
             bool shouldStore = false;
 
             // ====================================================
@@ -603,10 +636,10 @@ namespace RFIDReaderPortal.Services
                     rfidData.LapTimes[1] = timestamp;
                     shouldStore = true;
 
-                    if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
-                    {
-                        rfidData.IsCompleted = true;
-                    }
+                    //if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
+                    //{
+                    //    rfidData.IsCompleted = true;
+                    //}
                 }
 
             }
