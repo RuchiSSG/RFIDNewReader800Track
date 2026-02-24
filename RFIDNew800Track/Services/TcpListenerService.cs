@@ -2,6 +2,7 @@
 using RFIDReaderPortal.Models;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -79,8 +80,32 @@ namespace RFIDReaderPortal.Services
             //IsRunning = false;
         }
 
+
+
         public void Start()
         {
+            _raceStarted=false;
+            _receivedDataDict.Clear();
+            _storedRfidData.Clear();
+            _snapshotData.Clear();
+            _lastProcessed.Clear();
+            _lastSeenScan.Clear();
+
+            // 🔥 STEP 4: QUEUE DRAIN KARO
+            while (_epcQueue.TryDequeue(out _)) { }
+
+            // 🔥 STEP 5: HEX BUFFER CLEAR KARO (lock ke saath)
+            lock (_hexBuffer)
+            {
+                _hexBuffer.Clear();
+            }
+
+            // 🔥 STEP 6: HEX STRING ARRAY CLEAR KARO
+            lock (_hexLock)
+            {
+                Array.Clear(_hexString, 0, _hexString.Length);
+                _hexdataCount = 0;
+            }
             if (!IsRunning)
             {
                 _tcpListener.Start();
@@ -126,7 +151,10 @@ namespace RFIDReaderPortal.Services
         //}
         public void StartRace()
         {
-            // 🔥 ENSURE LISTENER IS RUNNING
+            // 🔥 STEP 1: PEHLE RACE BAND KARO
+            _raceStarted = false;
+
+            // 🔥 STEP 2: LISTENER START KARO
             if (!IsRunning)
             {
                 _tcpListener.Start();
@@ -136,24 +164,36 @@ namespace RFIDReaderPortal.Services
                 _logger.LogInformation("TCP Listener restarted for new race");
             }
 
-            _raceStarted = true;
-            _raceStartTime = DateTime.Now;
-
+            // 🔥 STEP 3: SAB CLEAR KARO
             _receivedDataDict.Clear();
             _storedRfidData.Clear();
             _snapshotData.Clear();
             _lastProcessed.Clear();
+            _lastSeenScan.Clear();
 
+            // 🔥 STEP 4: QUEUE DRAIN KARO
             while (_epcQueue.TryDequeue(out _)) { }
 
+            // 🔥 STEP 5: HEX BUFFER CLEAR KARO (lock ke saath)
             lock (_hexBuffer)
             {
                 _hexBuffer.Clear();
             }
 
+            // 🔥 STEP 6: HEX STRING ARRAY CLEAR KARO
+            lock (_hexLock)
+            {
+                Array.Clear(_hexString, 0, _hexString.Length);
+                _hexdataCount = 0;
+            }
+
             _lastClearTime = DateTime.Now;
 
-            _logger.LogInformation("Race officially STARTED - old data cleared");
+            // 🔥 STEP 7: AB RACE START KARO — BILKUL LAST MEIN
+            _raceStartTime = DateTime.Now;
+            _raceStarted = true;
+
+            _logger.LogInformation($"Race officially STARTED at {_raceStartTime}");
         }
 
 
@@ -352,44 +392,14 @@ namespace RFIDReaderPortal.Services
         }
 
 
-// 4️⃣ EXTRACT EPC FROM HEX BUFFER
-//-------------------------------------------------------------
-//Method: ProcessHexBuffer()
-        private void ProcessHexBuffer(StringBuilder buffer)
-        {
-            string data = buffer.ToString();
-            //- Uses Regex:
-            //  @"E2801170000002[0-9A-F]{10}"
-            var matches = Regex.Matches(
-                data,
-                @"E2801170000002[0-9A-F]{10}",
-                RegexOptions.IgnoreCase
-            );
-
-            foreach (Match m in matches)
-            {
-                var epc = m.Value.ToUpperInvariant();
-                //_logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc}");
-                long datetime = DateTime.Now.Ticks;
-                _epcQueue.Enqueue((epc, DateTime.Now));
-                // _logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc},{DateTime.UtcNow}");
-                _logger.LogInformation($"MATCHED EPC FROM BUFFER 4444:{epc},{datetime}");
-                _logger.LogInformation($"MATCHED EPC FROM BUFFER: ");
-            }
-
-            // 🔥 REMOVE processed part completely
-            if (matches.Count > 0)
-            {
-                int lastIndex = matches[matches.Count - 1].Index +
-                                matches[matches.Count - 1].Length;
-
-                buffer.Remove(0, lastIndex);
-            }
-        }
+        // 4️⃣ EXTRACT EPC FROM HEX BUFFER
+        //-------------------------------------------------------------
+        //Method: ProcessHexBuffer()
         //private void ProcessHexBuffer(StringBuilder buffer)
         //{
         //    string data = buffer.ToString();
-
+        //    //- Uses Regex:
+        //    //  @"E2801170000002[0-9A-F]{10}"
         //    var matches = Regex.Matches(
         //        data,
         //        @"E2801170000002[0-9A-F]{10}",
@@ -399,7 +409,15 @@ namespace RFIDReaderPortal.Services
         //    foreach (Match m in matches)
         //    {
         //        var epc = m.Value.ToUpperInvariant();
-        //        _epcQueue.Enqueue((epc, DateTime.Now));
+        //        //_logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc}");
+        //        long datetime = DateTime.Now.Ticks;
+        //        if (_raceStarted)
+        //        {
+        //            _epcQueue.Enqueue((epc, DateTime.Now));
+        //        }
+        //        // _logger.LogInformation($"MATCHED EPC FROM BUFFER: {epc},{DateTime.UtcNow}");
+        //        _logger.LogInformation($"MATCHED EPC FROM BUFFER 4444:{epc},{datetime}");
+        //        _logger.LogInformation($"MATCHED EPC FROM BUFFER: ");
         //    }
 
         //    // 🔥 REMOVE processed part completely
@@ -411,11 +429,45 @@ namespace RFIDReaderPortal.Services
         //        buffer.Remove(0, lastIndex);
         //    }
         //}
+        private void ProcessHexBuffer(StringBuilder buffer)
+        {
+            string data = buffer.ToString();
+
+            var matches = Regex.Matches(
+                data,
+                @"E2801170000002[0-9A-F]{10}",
+                RegexOptions.IgnoreCase
+            );
+
+            foreach (Match m in matches)
+            {
+                var epc = m.Value.ToUpperInvariant();
+                _logger.LogInformation($"EPC FOUND: {epc}, raceStarted={_raceStarted}");
+
+                if (_raceStarted)
+                {
+                    _epcQueue.Enqueue((epc, DateTime.Now));
+                }
+            }
+
+            if (matches.Count > 0)
+            {
+                int lastIndex = matches[matches.Count - 1].Index
+                              + matches[matches.Count - 1].Length;
+                buffer.Remove(0, lastIndex);
+            }
+            // 🔥 Buffer bahut bada ho jaye aur koi match na mile to clear karo
+            else if (buffer.Length > 200)
+            {
+                // Last 50 chars rakhlo (partial EPC ke liye)
+                buffer.Remove(0, buffer.Length - 50);
+            }
+        }
 
 
-//5️⃣ EPC PROCESSING THREAD
-//-------------------------------------------------------------
-//Method: StartEpcProcessor()
+        //5️⃣ EPC PROCESSING THREAD
+        //-------------------------------------------------------------
+        //Method: StartEpcProcessor()
         private void StartEpcProcessor()
         {
             Task.Run(async () =>
@@ -535,7 +587,15 @@ namespace RFIDReaderPortal.Services
         //Method: ProcessTag()
         private void ProcessTag(string epc, DateTime timestamp)
         {
+            if (!_raceStarted)
+                return;
 
+            // 🔥 RACE START SE PEHLE KA Kोई BHI SCAN REJECT
+            if (_raceStartTime.HasValue && timestamp < _raceStartTime.Value)
+            {
+                _logger.LogInformation($"Pre-race tag rejected: {epc} ts={timestamp:HH:mm:ss.fff} raceStart={_raceStartTime.Value:HH:mm:ss.fff}");
+                return;
+            }
             Console.WriteLine($"TAG READ: {epc} at {timestamp:HH:mm:ss.fff}");
             // -Check if tag exists in _allowedTags.
             if (_allowedTags.IsEmpty)
@@ -689,9 +749,9 @@ namespace RFIDReaderPortal.Services
         }
 
 
-// 8️⃣ SAVE DATA TO API
-//-------------------------------------------------------------
-//Method: InsertStoredRfidDataAsync()
+        // 8️⃣ SAVE DATA TO API
+        //-------------------------------------------------------------
+        //Method: InsertStoredRfidDataAsync()
         public async Task<List<RFIDChestNoMappingDto>> InsertStoredRfidDataAsync()
         {
             if (_snapshotData == null || _snapshotData.Count == 0)
@@ -726,9 +786,9 @@ namespace RFIDReaderPortal.Services
             return result ?? new List<RFIDChestNoMappingDto>();
         }
 
-//        9️⃣ CLEAR DATA
-//-------------------------------------------------------------
-//Method: ClearData()
+        //        9️⃣ CLEAR DATA
+        //-------------------------------------------------------------
+        //Method: ClearData()
         public void ClearData()
         {
             _receivedDataDict.Clear();
@@ -746,12 +806,12 @@ namespace RFIDReaderPortal.Services
 
 
 
-//        🔟 LIVE DATA FETCH
-//-------------------------------------------------------------
-//Method: GetReceivedData()
-//- If race stopped → return snapshot
-//- If running → return current dictionary
-//- Ordered by TagId
+        //        🔟 LIVE DATA FETCH
+        //-------------------------------------------------------------
+        //Method: GetReceivedData()
+        //- If race stopped → return snapshot
+        //- If running → return current dictionary
+        //- Ordered by TagId
         public RfidData[] GetReceivedData()
         {
             if (!IsRunning && _snapshotData != null)

@@ -817,7 +817,7 @@ namespace RFIDReaderPortal.Controllers
         public IActionResult StartRace()
         {
             _tcpListenerService.Start();
-            _tcpListenerService.ClearData();
+           // _tcpListenerService.ClearData();
             _tcpListenerService.StartRace();
             return Json(new { success = true });
         }
