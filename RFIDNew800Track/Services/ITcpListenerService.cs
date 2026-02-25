@@ -13,7 +13,7 @@ namespace RFIDReaderPortal.Services
         void Start();
 
         void Stop();
-        void SetAllowedTags(IEnumerable<string> tagIds);
+        void SetAllowedTags(IEnumerable<string> tagIds, bool isActive = false);
         RfidData[] GetReceivedData();
 
         string[] GetHexData();

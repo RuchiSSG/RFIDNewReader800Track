@@ -35,6 +35,7 @@ namespace RFIDReaderPortal.Services
         private readonly IApiService _apiService;
         private readonly ILogger<TcpListenerService> _logger;
         private Timer _completionTimer;
+        private bool _isTagFilterActive = false;
         // Reduced window for better tag detection
         //private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromSeconds(2);
         private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromMilliseconds(300);
@@ -153,7 +154,7 @@ namespace RFIDReaderPortal.Services
         {
             // 🔥 STEP 1: PEHLE RACE BAND KARO
             _raceStarted = false;
-
+            _isTagFilterActive = true;
             // 🔥 STEP 2: LISTENER START KARO
             if (!IsRunning)
             {
@@ -598,16 +599,11 @@ namespace RFIDReaderPortal.Services
             }
             Console.WriteLine($"TAG READ: {epc} at {timestamp:HH:mm:ss.fff}");
             // -Check if tag exists in _allowedTags.
-            if (_allowedTags.IsEmpty)
-            {
-                _logger.LogInformation("AllowedTags not loaded yet. Skipping validation temporarily.");
-            }
-            else if (!_allowedTags.ContainsKey(epc))
+            if (_isTagFilterActive && !_allowedTags.IsEmpty && !_allowedTags.ContainsKey(epc))
             {
                 _logger.LogInformation($"Ignored unknown tag: {epc}");
                 return;
             }
-
 
             var rfidData = _receivedDataDict.GetOrAdd(epc, _ => new RfidData
             {
@@ -732,8 +728,9 @@ namespace RFIDReaderPortal.Services
 
         }
 
-        public void SetAllowedTags(IEnumerable<string> tagIds)
+        public void SetAllowedTags(IEnumerable<string> tagIds, bool isActive = false)
         {
+            _raceStarted=false;
             if (_raceStarted)
             {
                 _logger.LogWarning("Group change ignored. Race already started.");
@@ -743,7 +740,7 @@ namespace RFIDReaderPortal.Services
             _allowedTags.Clear();
             foreach (var tag in tagIds)
                 _allowedTags[tag.ToUpperInvariant()] = true;
-
+            _isTagFilterActive = isActive;
             _receivedDataDict.Clear();
             _lastProcessed.Clear();
         }
