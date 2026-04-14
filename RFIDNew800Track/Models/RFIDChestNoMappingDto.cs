@@ -12,6 +12,8 @@
         public string? eventId { get; set; }
         public string? Position { get; set; }
         public string? DeviceName { get; set; }
+        public string? categoryId { get; set; }
+        public string? categoryName { get; set; }
         public string? RecruitId { get; set; }
         public string? currentDateTime { get; set; }
     }

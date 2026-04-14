@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using RFIDReaderPortal.Models;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -53,9 +54,10 @@ namespace RFIDReaderPortal.Services
             throw new Exception("Failed to fetch recruitment events.");
         }
 
-        public async Task<object> GetAllCategorysync(string accessToken, string userid, string recruitid)
+        public async Task<object> GetAllCategorysync(string accessToken, string userid, string recruitid, string sesionid,string ipaddress)
         {
-            var url = $"{_baseUrl}CategoryMaster/GetAll?userid={userid}&recConfId={recruitid}";
+            //var recConfId = recruitid;
+            var url = $"{_baseUrl}CategoryMaster/GetCategory?userid={userid}&recruitid={recruitid}&sessionid={sesionid}&ipaddress={ipaddress}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -110,11 +112,11 @@ namespace RFIDReaderPortal.Services
         public async Task<List<RFIDChestNoMappingDto>> PostRFIDRunningLogAsync(
             string accessToken, string userid, string recruitid, string DeviceId,
             string Location, string eventName, string eventId, List<RfidData> rfidDataList,
-            string sessionid, string ipaddress)
+            string sessionid, string ipaddress, string categoryId, string categoryName)
         {
             try
             {
-                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog800Meter?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&eventId={eventId}&sessionid={sessionid}&ipaddress={ipaddress}";
+                var url = $"{_baseUrl}RFIDChestNoMapping/RFIDRunningLog800Meter?userid={userid}&recruitid={recruitid}&deviceid={DeviceId}&Location={Location}&eventName={eventName}&eventId={eventId}&sessionid={sessionid}&ipaddress={ipaddress}&categoryId={categoryId}&categoryName={categoryName}";
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
 
                 // Group by TagId
