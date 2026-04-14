@@ -630,7 +630,8 @@ namespace RFIDReaderPortal.Services
             // ====================================================
             if (_eventName == "100 Meter Running"
              || _eventName == "500 meter Running"
-             || _eventName == "800 Meter Running")
+             || _eventName == "800 Meter Running"
+             || _eventName == "1600 Meter Running")
             {
                 if (rfidData.LapTimes.Count == 0)
                     rfidData.LapTimes.Add(timestamp);
@@ -643,62 +644,62 @@ namespace RFIDReaderPortal.Services
             // ====================================================
             // 🟢 MULTI LAP (1600 Meter Running)
             // ====================================================
-            else if (_eventName == "1600 Meter Running")
-            {
-                if (rfidData.IsCompleted)
-                    return;
-                int maxLaps = 2;
-                TimeSpan minLapGap = TimeSpan.FromSeconds(20);
+            //else if (_eventName == "1600 Meter Running")
+            //{
+            //    if (rfidData.IsCompleted)
+            //        return;
+            //    int maxLaps = 2;
+            //    TimeSpan minLapGap = TimeSpan.FromSeconds(20);
 
-                // 🚫 Stop completely if already completed
-                if (rfidData.IsCompleted)
-                    return;
+            //    // 🚫 Stop completely if already completed
+            //    if (rfidData.IsCompleted)
+            //        return;
 
-                // 🔹 First crossing (Lap 1 start)
-                if (rfidData.LapTimes.Count == 0)
-                {
-                    rfidData.LapTimes.Add(timestamp);
-                    shouldStore = true;
-                    return;
-                }
+            //    // 🔹 First crossing (Lap 1 start)
+            //    if (rfidData.LapTimes.Count == 0)
+            //    {
+            //        rfidData.LapTimes.Add(timestamp);
+            //        shouldStore = true;
+            //        return;
+            //    }
 
-                DateTime firstLapTime = rfidData.LapTimes[0];
+            //    DateTime firstLapTime = rfidData.LapTimes[0];
 
-                // 🔹 Start Lap 2 only once
-                if (rfidData.LapTimes.Count == 1)
-                {
-                    var gapFromLap1 = timestamp - firstLapTime;
+            //    // 🔹 Start Lap 2 only once
+            //    if (rfidData.LapTimes.Count == 1)
+            //    {
+            //        var gapFromLap1 = timestamp - firstLapTime;
 
-                    if (gapFromLap1 >= minLapGap)
-                    {
-                        rfidData.LapTimes.Add(timestamp);
-                        shouldStore = true;
-                    }
-                    else
-                    {
-                        // live update lap1
-                        rfidData.LapTimes[0] = timestamp;
-                        shouldStore = true;
-                    }
+            //        if (gapFromLap1 >= minLapGap)
+            //        {
+            //            rfidData.LapTimes.Add(timestamp);
+            //            shouldStore = true;
+            //        }
+            //        else
+            //        {
+            //            // live update lap1
+            //            rfidData.LapTimes[0] = timestamp;
+            //            shouldStore = true;
+            //        }
 
-                    return;
-                }
+            //        return;
+            //    }
 
-                // 🔹 Only update Lap 2 (never add Lap 3)
-                if (rfidData.LapTimes.Count == 2)
-                {
-                    var previousLap2 = rfidData.LapTimes[1];
+            //    // 🔹 Only update Lap 2 (never add Lap 3)
+            //    if (rfidData.LapTimes.Count == 2)
+            //    {
+            //        var previousLap2 = rfidData.LapTimes[1];
 
-                    rfidData.LapTimes[1] = timestamp;
-                    shouldStore = true;
+            //        rfidData.LapTimes[1] = timestamp;
+            //        shouldStore = true;
 
-                    //if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
-                    //{
-                    //    rfidData.IsCompleted = true;
-                    //}
-                }
+            //        //if ((timestamp - previousLap2) >= TimeSpan.FromSeconds(2))
+            //        //{
+            //        //    rfidData.IsCompleted = true;
+            //        //}
+            //    }
 
-            }
+            //}
 
 
 

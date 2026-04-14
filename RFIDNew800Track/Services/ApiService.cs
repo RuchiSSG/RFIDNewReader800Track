@@ -142,13 +142,12 @@ namespace RFIDReaderPortal.Services
                     //Lap4 = x.LapTimes.Count >= 4 ? x.LapTimes[3].ToString("HH:mm:ss:fff") : null,
                     //Lap5 = x.LapTimes.Count >= 5 ? x.LapTimes[4].ToString("HH:mm:ss:fff") : null,
 
-                    TotalLaps =
-         eventName == "1600 Meter Running" ? 1 : 1,
-
+         //           TotalLaps =
+         //eventName == "1600 Meter Running" ? 1 : 1,
+                    TotalLaps = 1,
                     EventName = eventName
                 }).ToList();
-
-
+              
                 // Send request
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 request.Content = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
