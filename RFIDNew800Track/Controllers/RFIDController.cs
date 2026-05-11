@@ -688,159 +688,160 @@ namespace RFIDReaderPortal.Controllers
             //}
         }
 
-        public async Task<IActionResult> Configuration()
-        {
-            try
+            public async Task<IActionResult> Configuration()
             {
-                var httpClient = new HttpClient();
-                ApiService apiservice = new ApiService(httpClient, _configuration, _logger);
-
-                string accessToken = Request.Cookies["accesstoken"]?.Replace("Bearer ", "");
-                string userid = Request.Cookies["UserId"];
-                string recruitid = Request.Cookies["recruitid"];
-                string deviceid = Request.Cookies["DeviceId"];
-                string ipaddress = Request.Cookies["IpAddress"];
-                string sesionid = Request.Cookies["sessionid"];
-
-                if (string.IsNullOrEmpty(accessToken))
-                    return RedirectToAction("Login", "Account");
-
-                // ===================== EVENTS API =====================
-                dynamic events;
                 try
                 {
-                    events = await apiservice.GetAllRecruitEventsAsync(accessToken, userid, recruitid, sesionid, ipaddress);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return RedirectToAction("Login", "Account");
-                }
+                    var httpClient = new HttpClient();
+                    ApiService apiservice = new ApiService(httpClient, _configuration, _logger);
 
-                dynamic responsemodel = events.outcome;
-                IEnumerable<RecruitmentEventDto> eventData;
+                    string accessToken = Request.Cookies["accesstoken"]?.Replace("Bearer ", "");
+                    string userid = Request.Cookies["UserId"];
+                    string recruitid = Request.Cookies["recruitid"];
+                    string deviceid = Request.Cookies["DeviceId"];
+                    string ipaddress = Request.Cookies["IpAddress"];
+                    string sesionid = Request.Cookies["sessionid"];
 
-                if (events.data is JObject dataObject)
-                {
-                    eventData = new List<RecruitmentEventDto> { dataObject.ToObject<RecruitmentEventDto>() };
-                }
-                else if (events.data is JArray eventArray)
-                {
-                    eventData = eventArray.ToObject<List<RecruitmentEventDto>>();
-                }
-                else
-                {
-                    throw new InvalidOperationException("Unexpected data type");
-                }
+                    if (string.IsNullOrEmpty(accessToken))
+                        return RedirectToAction("Login", "Account");
 
-                // ✅ Token refresh
-                string newtoken = responsemodel?.tokens?.ToString();
-                if (!string.IsNullOrEmpty(newtoken))
-                {
-                    accessToken = newtoken.Replace("Bearer ", "");
-                    Response.Cookies.Append("accesstoken", accessToken);
-                }
-
-                // ===================== RFID DISCOVERY =====================
-                var (readerIPs, statusMessage) = await _rfidDiscoveryService.DiscoverRFIDReadersAsync();
-
-                DeviceConfigurationDto model = new DeviceConfigurationDto
-                {
-                    DeviceId = readerIPs.Any() ? readerIPs.First() : "No device found",
-                    statusmessage = statusMessage,
-                    RecruitId = recruitid,
-                    UserId = userid
-                };
-
-                Response.Cookies.Append("DeviceId", model.DeviceId);
-
-                ViewBag.UserId = userid;
-                ViewBag.RecruitId = recruitid;
-
-                // ===================== DEVICE CONFIG API =====================
-                dynamic getAsyncResponse;
-                try
-                {
-                    getAsyncResponse = await _apiService.GetAsync(accessToken, userid, model.DeviceId, sesionid, ipaddress);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return RedirectToAction("Login", "Account");
-                }
-
-                string newTokenFromGet = getAsyncResponse?.outcome?.tokens?.ToString();
-                if (!string.IsNullOrEmpty(newTokenFromGet))
-                {
-                    accessToken = newTokenFromGet.Replace("Bearer ", "");
-                    Response.Cookies.Append("accesstoken", accessToken);
-                }
-
-                List<DeviceConfigurationDto> ipDataResponse = new List<DeviceConfigurationDto>();
-                if (getAsyncResponse?.data is JArray dataArray)
-                {
-                    ipDataResponse = dataArray.ToObject<List<DeviceConfigurationDto>>() ?? new List<DeviceConfigurationDto>();
-                }
-
-                // ===================== CATEGORY API =====================
-                List<CategoryMasterDto> categoryData = new List<CategoryMasterDto>();
-                try
-                {
-                    //dynamic categories = await apiservice.GetAllCategorysync(accessToken, userid, recruitid);
-                    dynamic categories = await apiservice.GetAllCategorysync(
-    accessToken, userid, recruitid, sesionid, ipaddress);
-                    if (categories?.data is JArray categoryArray)
+                    // ===================== EVENTS API =====================
+                    dynamic events;
+                    try
                     {
-                        categoryData = categoryArray.ToObject<List<CategoryMasterDto>>();
+                        events = await apiservice.GetAllRecruitEventsAsync(accessToken, userid, recruitid, sesionid, ipaddress);
                     }
-                    string categoryToken = categories?.outcome?.tokens?.ToString();
-                    if (!string.IsNullOrEmpty(categoryToken))
+                    catch (UnauthorizedAccessException)
                     {
-                        accessToken = categoryToken.Replace("Bearer ", "");
+                        return RedirectToAction("Login", "Account");
+                    }
+
+                    dynamic responsemodel = events.outcome;
+                    IEnumerable<RecruitmentEventDto> eventData;
+
+                    if (events.data is JObject dataObject)
+                    {
+                        eventData = new List<RecruitmentEventDto> { dataObject.ToObject<RecruitmentEventDto>() };
+                    }
+                    else if (events.data is JArray eventArray)
+                    {
+                        eventData = eventArray.ToObject<List<RecruitmentEventDto>>();
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Unexpected data type");
+                    }
+
+                    // ✅ Token refresh
+                    string newtoken = responsemodel?.tokens?.ToString();
+                    if (!string.IsNullOrEmpty(newtoken))
+                    {
+                        accessToken = newtoken.Replace("Bearer ", "");
                         Response.Cookies.Append("accesstoken", accessToken);
                     }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return RedirectToAction("Login", "Account");
-                }
 
-                // ===================== SET COOKIES =====================
-                foreach (var item in ipDataResponse)
-                {
-                    if (!string.IsNullOrEmpty(item.Location))
-                        Response.Cookies.Append("Location", item.Location);
+                    // ===================== RFID DISCOVERY =====================
+                    var (readerIPs, statusMessage) = await _rfidDiscoveryService.DiscoverRFIDReadersAsync();
 
-                    if (!string.IsNullOrEmpty(item.eventName))
-                        Response.Cookies.Append("EventName", item.eventName);
-
-                    if (!string.IsNullOrEmpty(item.EventId))
-                        Response.Cookies.Append("EventId", item.EventId);
-                }
-
-                // ===================== FINAL RETURN =====================
-                if (ipDataResponse.Count == 0)
-                {
-                    return View("Index", new RFIDViewModel
+                    DeviceConfigurationDto model = new DeviceConfigurationDto
                     {
-                        Events = eventData,
-                        ReaderIPs = readerIPs,
-                        StatusMessage = statusMessage,
-                        Categories = categoryData,
+                        DeviceId = readerIPs.Any() ? readerIPs.First() : "No device found",
+                        statusmessage = statusMessage,
+                        RecruitId = recruitid,
+                        UserId = userid
+                    };
+
+                    Response.Cookies.Append("DeviceId", model.DeviceId);
+
+                    ViewBag.UserId = userid;
+                    ViewBag.RecruitId = recruitid;
+
+                    // ===================== DEVICE CONFIG API =====================
+                    dynamic getAsyncResponse;
+                    try
+                    {
+                            getAsyncResponse = await _apiService.GetAsync(accessToken, userid, model.DeviceId,model.RecruitId, sesionid, ipaddress);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        return RedirectToAction("Login", "Account");
+                    }
+           
+
+                string newTokenFromGet = getAsyncResponse?.outcome?.tokens?.ToString();
+                    if (!string.IsNullOrEmpty(newTokenFromGet))
+                    {
+                        accessToken = newTokenFromGet.Replace("Bearer ", "");
+                        Response.Cookies.Append("accesstoken", accessToken);
+                    }
+
+                    List<DeviceConfigurationDto> ipDataResponse = new List<DeviceConfigurationDto>();
+                    if (getAsyncResponse?.data is JArray dataArray)
+                    {
+                        ipDataResponse = dataArray.ToObject<List<DeviceConfigurationDto>>() ?? new List<DeviceConfigurationDto>();
+                    }
+
+                    // ===================== CATEGORY API =====================
+                    List<CategoryMasterDto> categoryData = new List<CategoryMasterDto>();
+                    try
+                    {
+                        //dynamic categories = await apiservice.GetAllCategorysync(accessToken, userid, recruitid);
+                        dynamic categories = await apiservice.GetAllCategorysync(
+        accessToken, userid, recruitid, sesionid, ipaddress);
+                        if (categories?.data is JArray categoryArray)
+                        {
+                            categoryData = categoryArray.ToObject<List<CategoryMasterDto>>();
+                        }
+                        string categoryToken = categories?.outcome?.tokens?.ToString();
+                        if (!string.IsNullOrEmpty(categoryToken))
+                        {
+                            accessToken = categoryToken.Replace("Bearer ", "");
+                            Response.Cookies.Append("accesstoken", accessToken);
+                        }
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        return RedirectToAction("Login", "Account");
+                    }
+
+                    // ===================== SET COOKIES =====================
+                    foreach (var item in ipDataResponse)
+                    {
+                        if (!string.IsNullOrEmpty(item.Location))
+                            Response.Cookies.Append("Location", item.Location);
+
+                        if (!string.IsNullOrEmpty(item.eventName))
+                            Response.Cookies.Append("EventName", item.eventName);
+
+                        if (!string.IsNullOrEmpty(item.EventId))
+                            Response.Cookies.Append("EventId", item.EventId);
+                    }
+
+                    // ===================== FINAL RETURN =====================
+                    if (ipDataResponse.Count == 0)
+                    {
+                        return View("Index", new RFIDViewModel
+                        {
+                            Events = eventData,
+                            ReaderIPs = readerIPs,
+                            StatusMessage = statusMessage,
+                            Categories = categoryData,
+                        });
+                    }
+                    else
+                    {
+                        return RedirectToAction("Reader");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in Configuration");
+                    return View("Error", new ErrorViewModel
+                    {
+                        RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier
                     });
                 }
-                else
-                {
-                    return RedirectToAction("Reader");
-                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in Configuration");
-                return View("Error", new ErrorViewModel
-                {
-                    RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier
-                });
-            }
-        }
         //public async Task<IActionResult> Configuration()
 
         //{
@@ -1154,6 +1155,7 @@ namespace RFIDReaderPortal.Controllers
                 string eventId = Request.Cookies["EventId"];
                 string ipaddress = Request.Cookies["IpAddress"];
                 string sesionid = Request.Cookies["sessionid"];
+                ViewBag.ReleaseUrl = _configuration["ReleaseDeviceUrl"];
 
                 if (!_tcpListenerService.IsRunning)
                 {
@@ -1170,13 +1172,40 @@ namespace RFIDReaderPortal.Controllers
 
                 var rfidDataArray = _tcpListenerService.GetReceivedData();
 
-                dynamic getAsyncResponse = await _apiService.GetAsync(accessToken, userid, deviceId, sesionid, ipaddress);
+                dynamic getAsyncResponse = await _apiService.GetAsync(accessToken, userid, deviceId,recruitid, sesionid, ipaddress);
 
                 // Handle token refresh if provided
                 if (getAsyncResponse?.outcome?.tokens != null)
                 {
                     string newToken = getAsyncResponse.outcome.tokens.ToString();
                     Response.Cookies.Append("accesstoken", newToken);
+                }
+                // ===================== HANDLE DEVICE MAPPED =====================
+                int outcomeId = getAsyncResponse?.outcome?.outcomeId ?? 0;
+
+                string outcomeMessage =
+                    getAsyncResponse?.outcome?.outcomeDetail?.ToString();
+
+                if (outcomeId == 2)
+                {
+                    ViewBag.ErrorMessage = outcomeMessage;
+
+                    if (getAsyncResponse?.data != null)
+                    {
+                        var mappedData = JsonConvert.DeserializeObject<List<DeviceConfigurationDto>>(
+                            JsonConvert.SerializeObject(getAsyncResponse.data)
+                        );
+
+                        if (mappedData != null && mappedData.Count > 0)
+                        {
+                            ViewBag.Post = mappedData[0].Post;
+                            ViewBag.Place = mappedData[0].Place;
+                            ViewBag.Year = mappedData[0].Year;
+                            ViewBag.UserName = mappedData[0].UserName;
+                            ViewBag.eventName = mappedData[0].eventName;
+
+                        }
+                    }
                 }
 
                 // Convert the dynamic data to List<DeviceConfigurationDto>

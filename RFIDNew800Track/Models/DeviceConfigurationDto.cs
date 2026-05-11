@@ -10,9 +10,6 @@ namespace RFIDReaderPortal.Models
         public Guid? Id { get; set; }
         public string? RecruitId { get; set; }
         public string? EventId { get; set; }
-
-       // public string? eventName { get; set; }
-
         public string? eventName { get; set; }
 
         public string? categoryId { get; set; }
@@ -20,9 +17,11 @@ namespace RFIDReaderPortal.Models
 
         public string? UserId { get; set; }
         public string? DeviceId { get; set; }
-        
+        public string? UserName { get; set; }
         public string? Location { get; set; }
-
+        public string? Post { get; set; }
+        public string? Place { get; set; }
+        public string? Year { get; set; }
         public dynamic outcome { get; set; }
         public string? IsActive { get; set; }
         public string? sessionid { get; set; }
