@@ -133,22 +133,96 @@
             // Help click event
             $(document).on('click', '#helpLink', function () {
 
-                Swal.fire({
-                    title: 'How to Connect RFID Reader',
-                    html: `
-                        <ol style="text-align:left;">
-                            <li>Ensure the RFID Reader device is powered ON.</li>
-                            <li>Connect the RFID Reader to the same network.</li>
-                            <li>Check LAN/WiFi cable connection.</li>
-                            <li>Verify the Reader IP Address configuration.</li>
-                            <li>Restart the RFID Reader device if needed.</li>
-                            <li>Make sure the server can ping the device.</li>
-                            <li>Refresh this page after reconnecting.</li>
-                        </ol>
-                    `,
-                    icon: 'info',
-                    confirmButtonText: 'OK'
-                });
+                        Swal.fire({
+            title: 'How to Connect RFID Reader',
+            width: '900px',
+            html: `
+                <div style="text-align:left; max-height:500px; overflow-y:auto; padding-right:10px;">
+
+                    <ol>
+
+                        <li>Ensure the RFID Reader device is powered ON.</li>
+
+                        <li>Connect the RFID Reader to the same network.</li>
+
+                        <li>Check LAN/WiFi cable connection.</li>
+
+                        <li>Verify the Reader IP Address configuration.</li>
+
+                        <br/>
+
+                        <h5><b>How to Set IP Address</b></h5>
+                          
+                                <li>	Go to Network & Internet → Network Connections.</li>
+                                <li>	Right-click Ethernet → Properties.</li>
+
+
+                        <p>
+                            Configure the RFID Reader IP Address from the device network settings.
+                            Ensure the IP is reachable from the system machine.
+                        </p>
+
+                        <!-- Screenshot 1 -->
+                        <img src="/RFIDImages/ipsetincontrolpanel.png"
+                             alt="IP Configuration"
+                             style="width:100%; border:1px solid #ccc; border-radius:5px; margin-bottom:15px;" />
+
+                        <hr/>
+
+                        <h5><b>Access RFID Reader in Browser</b></h5>
+
+                        <li>Open a web browser.</li>
+
+                        <li>
+                            Enter the reader IP address:
+                            <b>http://192.168.0.131</b>
+                        </li>
+
+                        <li>
+                            Login using device credentials.<br/>
+                            <b>UserName:</b> admin<br/>
+                            <b>Password:</b> admin
+                        </li>
+
+                        <li>
+                            Go to:
+                            <b>Serial Channel Configuration</b> (IMPORTANT)
+                        </li>
+
+                        <li>
+                            Serial Channel → Channel1 → Connection Setting
+                        </li>
+
+                        <li>
+                            Set Endpoint Configuration:
+                            <br/>
+                            Enter:
+                            <ul>
+                                <li><b>Local Port:</b> Reader port </li>
+                                <li><b>Remote Port:</b> 9090</li>
+                                <li><b>Remote Host:</b> System IP Address</li>
+                            </ul>
+
+                            Then click:
+                            <b>Submit → Apply/Restart</b>
+                        </li>
+
+                        <br/>
+
+                        <!-- Screenshot 2 -->
+                        <img src="/RFIDImages/browseripset.png"
+                             alt="RFID Browser Login"
+                             style="width:100%; border:1px solid #ccc; border-radius:5px; margin-bottom:15px;" />
+
+                         
+
+                    </ol>
+
+                </div>
+            `,
+            icon: 'info',
+            confirmButtonText: 'OK'
+        });
 
             });
 
