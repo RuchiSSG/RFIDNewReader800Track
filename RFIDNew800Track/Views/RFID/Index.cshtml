@@ -5,7 +5,21 @@
     var events = Model.Events;
     var ipAddress = string.Join(", ", Model.ReaderIPs);
 }
+<style>
+    .device-connected {
+        background-color: #d4edda !important;
+        border: 2px solid #28a745 !important;
+        color: #155724 !important;
+        font-weight: bold;
+    }
 
+    .device-disconnected {
+        background-color: #f8d7da !important;
+        border: 2px solid #dc3545 !important;
+        color: #721c24 !important;
+        font-weight: bold;
+    }
+</style>
 <h2>RFID Reader Configuration</h2>
 
 @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -20,8 +34,14 @@
             <form id="eventForm" method="post" onsubmit="return SubmitButton(event);">
                 <div class="mb-3">
                     <label for="deviceName" class="form-label">Device Name:</label>
-                    <input type="text" id="deviceName" class="form-control" value="@(Model.ReaderIPs?.FirstOrDefault() ?? "")" readonly>
 
+                    <input type="text"
+                           id="deviceName"
+                           class="form-control"
+                           value="@(Model.ReaderIPs?.FirstOrDefault() ?? "")"
+                           readonly>
+
+                    <small id="connectionStatus" class="fw-bold"></small>
                 </div>
 
                 <div class="mb-3">
@@ -37,20 +57,21 @@
                         }
                     </select>
                 </div>
-               <div class="mb-3">
-    <label for="categoryDropdown" class="form-label">Category:</label>
-    <select class="form-select" id="categoryDropdown" name="categoryDropdown">
-        <option value="">-- Select Category --</option>
+                <div class="mb-3">
+                    <label for="categoryDropdown" class="form-label">Category:</label>
+                    <select class="form-select" id="categoryDropdown" name="categoryDropdown">
+                        <option value="">-- Select Category --</option>
 
-        @if (Model.Categories != null && Model.Categories.Any())
-        {
-            foreach (var item in Model.Categories)
-            {
-                <option value="@item.Id">@item.CategoryName</option>
-            }
-        }
-    </select>
-</div>
+                        @if (Model.Categories != null && Model.Categories.Any())
+                        {
+                            foreach (var item in Model.Categories)
+                            {
+                                <option value="@item.Id">@item.CategoryName</option>
+                            }
+                        }
+                    </select>
+                </div>
+
                 <div class="mb-3">
                     <label for="locationDropdown" class="form-label">Location:</label>
                     <select class="form-select" id="locationDropdown" name="locationDropdown">
@@ -75,7 +96,34 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="text/javascript">
+                $(document).ready(function () {
 
+            var deviceInput = $('#deviceName');
+            var statusText = $('#connectionStatus');
+
+            // Check if IP/device name exists
+            if (deviceInput.val().trim() !== "") {
+
+                // Green color for connected
+                deviceInput.addClass('device-connected');
+
+                // Show connected text
+                statusText
+                    .text('● Connected')
+                    .css('color', 'green');
+
+            } else {
+
+                // Red color for disconnected
+                deviceInput.addClass('device-disconnected');
+
+                // Show disconnected text
+                statusText
+                    .text('● Disconnected')
+                    .css('color', 'red');
+            }
+
+        });
         // Configure toastr
         toastr.options = {
             "closeButton": true,
@@ -87,9 +135,9 @@
         // Show login success message if it exists
         @if (TempData["SuccessMessage"] != null)
         {
-                <text>
-                    toastr.success('@TempData["SuccessMessage"]');
-                </text>
+                        <text>
+                            toastr.success('@TempData["SuccessMessage"]');
+                        </text>
         }
 
             function SubmitButton(event) {
@@ -102,8 +150,8 @@
                 var eventDropdown = $('#eventDropdown').val();
                  var eventName = $('#eventDropdown option:selected').text();
                 var locationDropdown = $('#locationDropdown').val();
-                var categoryDropdown = $('#categoryDropdown').val();
-                var categoryName = $('#categoryDropdown option:selected').text();
+        var categoryDropdown = $('#categoryDropdown').val();
+                       var categoryName = $('#categoryDropdown option:selected').text();
                 // Use Razor to get server-side values for UserId and RecruitId
                 const userid = '@ViewBag.UserId';
                 const recruitid = '@ViewBag.RecruitId';
@@ -113,8 +161,8 @@
                     DeviceId: deviceName,
                     EventId: eventDropdown,
                     eventName: eventName,
-                    CategoryId: categoryDropdown,    
-                    CategoryName: categoryName,  
+                    CategoryId: categoryDropdown,
+                    CategoryName: categoryName,
                     Location: locationDropdown,
                     UserId: userid,
                     RecruitId: recruitid
@@ -139,7 +187,7 @@
                                 confirmButtonText: 'OK'
                             }).then((result) => {
                                 if (result.isConfirmed) {
-                                       window.location.href = response.redirectUrl
+                                   window.location.href = response.redirectUrl
         + '?eventId=' + encodeURIComponent(eventDropdown)
         + '&categoryId=' + encodeURIComponent(categoryDropdown);
 
