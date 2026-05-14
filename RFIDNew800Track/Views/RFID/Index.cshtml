@@ -96,7 +96,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="text/javascript">
-                $(document).ready(function () {
+                       $(document).ready(function () {
 
             var deviceInput = $('#deviceName');
             var statusText = $('#connectionStatus');
@@ -109,7 +109,7 @@
 
                 // Show connected text
                 statusText
-                    .text('● Connected')
+                    .html('✅ Connected')
                     .css('color', 'green');
 
             } else {
@@ -117,11 +117,40 @@
                 // Red color for disconnected
                 deviceInput.addClass('device-disconnected');
 
-                // Show disconnected text
+                // Show disconnected text with Help link
                 statusText
-                    .text('● Disconnected')
+                    .html(`
+                        ❌ Disconnected
+                        <a href="javascript:void(0);"
+                           id="helpLink"
+                           style="margin-left:10px; text-decoration:underline; color:#007bff;">
+                           Help
+                        </a>
+                    `)
                     .css('color', 'red');
             }
+
+            // Help click event
+            $(document).on('click', '#helpLink', function () {
+
+                Swal.fire({
+                    title: 'How to Connect RFID Reader',
+                    html: `
+                        <ol style="text-align:left;">
+                            <li>Ensure the RFID Reader device is powered ON.</li>
+                            <li>Connect the RFID Reader to the same network.</li>
+                            <li>Check LAN/WiFi cable connection.</li>
+                            <li>Verify the Reader IP Address configuration.</li>
+                            <li>Restart the RFID Reader device if needed.</li>
+                            <li>Make sure the server can ping the device.</li>
+                            <li>Refresh this page after reconnecting.</li>
+                        </ol>
+                    `,
+                    icon: 'info',
+                    confirmButtonText: 'OK'
+                });
+
+            });
 
         });
         // Configure toastr
